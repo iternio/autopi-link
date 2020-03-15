@@ -14,28 +14,23 @@ first_run_time = datetime.now()
 # https://github.com/plord12/autopi-tools
 
 log = logging.getLogger(__name__)
-
-###################################################################################################
-# Update these when setting up the code for use.
-abrp_token = '{{{abrp_token}}}'
-car_model = '{{{car_model}}}'
 ###################################################################################################
 abrp_apikey = '6f6a554f-d8c8-4c72-8914-d5895f58b1eb'
 
-def tlm(test=False,testdata=None):
+def tlm(test=False,testdata=None, token=None, car_model=None):
   while(True):
     modtime = datetime.fromtimestamp(os.stat(os.path.abspath(__file__)).st_mtime)
     if modtime > first_run_time:
       safelog("ABRP Script has been updated, restarting to incorporate updates.")
       os._exit(1)
     try:
-      get_tlm(test=test,testdata=testdata)
+      get_tlm(test=test,testdata=testdata,token=token,car_model=car_model)
     except Exception as e:
       safelog(traceback.format_exc(e))
       quit()
     time.sleep(2.5)
 
-def get_tlm(test=False,testdata=None):
+def get_tlm(test=False,testdata=None,token=None,car_model=None):
   data = {}
   location = None
   if test:
@@ -79,43 +74,28 @@ def get_tlm(test=False,testdata=None):
     data['lon'] = location['lon']
     data['elevation'] = location['alt']
 
-  params = {'token': abrp_token, 'api_key': abrp_apikey, 'tlm': json.dumps(data, separators=(',',':'))}
+  if token and car_model:
 
-  url = 'https://api.iternio.com/1/tlm/send?'+urllib.urlencode(params)
+    params = {'token': token, 'api_key': abrp_apikey, 'tlm': json.dumps(data, separators=(',',':'))}
 
-  try:
-    res = urllib.urlopen(url)
-    status = json.loads(res.read())
-    # status = requests.get(url)
-  except:
-    status = None
-  if test:
-    print(str(data))
-    print(url)
-    print(str(status))
+    url = 'https://api.iternio.com/1/tlm/send?'+urllib.urlencode(params)
+
+    try:
+      res = urllib.urlopen(url)
+      status = json.loads(res.read())
+      # status = requests.get(url)
+    except:
+      status = None
+    if test:
+      print(str(data))
+      print(url)
+      print(str(status))
+    else:
+      log.info(str(data))
+      log.info (url)
+      log.info(str(status))
   else:
-    log.info(str(data))
-    log.info (url)
-    log.info(str(status))
-
-###################################################################################################
-# Following are methods for managing sleep timers of the dongle
-# def clear_sleep_timers():
-#   try:
-#     args = ['sleep_timer']
-#     kwargs = {
-#       'clear': "*",
-#     }
-#     __salt__['power.sleep_timer'](**kwargs)
-#   except:
-#     pass
-
-# # Function to determine if the car should be awake.  Will probably have to have special cases.
-# def should_be_asleep(data):
-#   if ("speed" in data and data["speed"] > 0) or ("power" in data and abs(data["power"]) > 0) or ("is_charging" in data and data["is_charging"] > 0):
-#     return False
-#   else:
-#     return True
+    safelog("Token or Car Model missing from job kwargs")
 
 ###################################################################################################
 # Following are methods for retrieving data from the car
@@ -280,8 +260,8 @@ if __name__ == "__main__":
 
   tlm(test=True,testdata={"soc": 88.4, "soh":100, "voltage":388.0, "current": 40,
     "is_charging": 0, "ext_temp":20, "batt_temp": 20, "lat":29.5641, "lon":-95.0255, "speed":113.2
-  })
+  },token="test",car_model='chevy:bolt:17:60:other')
   
   tlm(test=True,testdata={"soc": 88.4, "soh":100, "voltage":388.0, "current": 0,
     "is_charging": 0, "ext_temp":20, "batt_temp": 20, "lat":29.5641, "lon":-95.0255, "speed":0
-  })
+  },token="test",car_model='chevy:bolt:17:60:other')

@@ -26,15 +26,12 @@ def tlm(test=False,testdata=None):
   while(True):
     modtime = datetime.fromtimestamp(os.stat(os.path.abspath(__file__)).st_mtime)
     if modtime > first_run_time:
-      log("ABRP Script has been updated, restarting to incorporate updates.")
+      safelog("ABRP Script has been updated, restarting to incorporate updates.")
       os._exit(1)
     try:
       get_tlm(test=test,testdata=testdata)
     except Exception as e:
-      try:
-        log(traceback.format_exc(e))
-      except:
-        print(traceback.format_exc(e))
+      safelog(traceback.format_exc(e))
       quit()
     time.sleep(2.5)
 
@@ -82,10 +79,6 @@ def get_tlm(test=False,testdata=None):
     data['lon'] = location['lon']
     data['elevation'] = location['alt']
 
-  # allow sleep if vehicle in motion or charging.
-  if not should_be_asleep(data):
-    clear_sleep_timers()
-
   params = {'token': abrp_token, 'api_key': abrp_apikey, 'tlm': json.dumps(data, separators=(',',':'))}
 
   url = 'https://api.iternio.com/1/tlm/send?'+urllib.urlencode(params)
@@ -107,22 +100,22 @@ def get_tlm(test=False,testdata=None):
 
 ###################################################################################################
 # Following are methods for managing sleep timers of the dongle
-def clear_sleep_timers():
-  try:
-    args = ['sleep_timer']
-    kwargs = {
-      'clear': "*",
-    }
-    __salt__['power.sleep_timer'](**kwargs)
-  except:
-    pass
+# def clear_sleep_timers():
+#   try:
+#     args = ['sleep_timer']
+#     kwargs = {
+#       'clear': "*",
+#     }
+#     __salt__['power.sleep_timer'](**kwargs)
+#   except:
+#     pass
 
-# Function to determine if the car should be awake.  Will probably have to have special cases.
-def should_be_asleep(data):
-  if ("speed" in data and data["speed"] > 0) or ("power" in data and abs(data["power"]) > 0) or ("is_charging" in data and data["is_charging"] > 0):
-    return False
-  else:
-    return True
+# # Function to determine if the car should be awake.  Will probably have to have special cases.
+# def should_be_asleep(data):
+#   if ("speed" in data and data["speed"] > 0) or ("power" in data and abs(data["power"]) > 0) or ("is_charging" in data and data["is_charging"] > 0):
+#     return False
+#   else:
+#     return True
 
 ###################################################################################################
 # Following are methods for retrieving data from the car
@@ -233,7 +226,7 @@ def get_pids(car_model):
       'soh':        "22,41a3,({us:1:2})/18.0,7E4",
       'voltage':    "22,2885,({us:1:2})/100.0,7E1",
       'current':    "22,2414,({s:1:2})/20.0,7E1",
-      'speed':      "22,000D,{1},7E0",
+      # 'speed':      "22,000D,{1},7E0",
       'is_charging':"22,436c,({s:1:2})/20.0,7E4",
       'ext_temp':   "22,801E,({1}/2)-40.0,7E4",
       'batt_temp':  "22,434F,({1}-40.0),7E4",
@@ -269,6 +262,12 @@ def check_formula(formula):
   formula = re.sub("message.data","mdata",formula,flags=re.I)
   mdata = "7E81014490201314731"
   eval(formula)
+
+def safelog(text):
+  try:
+    log(text)
+  except:
+    print(text)
 
 if __name__ == "__main__":
   print "Running from command line."

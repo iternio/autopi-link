@@ -74,7 +74,7 @@ def get_tlm(test=False,testdata=None,token=None,car_model=None):
     data['lon'] = location['lon']
     data['elevation'] = location['alt']
 
-  if token and car_model:
+  if token and car_model and "lat" in data and "soc" in data:
 
     params = {'token': token, 'api_key': abrp_apikey, 'tlm': json.dumps(data, separators=(',',':'))}
 

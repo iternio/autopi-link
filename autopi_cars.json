@@ -1,0 +1,7 @@
+{
+  "chevy:bolt:17:60:other": {"wake_pid": "Mode=22, Code=2414, Header=7E1"},
+  "chevy:bolt:20:66": {"wake_pid": "Mode=22, Code=2414, Header=7E1"},
+  "opel:ampera-e:17:60:other": {"wake_pid": "Mode=22, Code=2414, Header=7E1"},
+  "hyundai:kona:19:64:other": {"wake_pid": "Unknown"},
+  "hyundai:kona:19:39:other": {"wake_pid": "Unknown"}
+}

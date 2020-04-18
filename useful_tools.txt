@@ -1,0 +1,6 @@
+ssh pi@local.autopi.io
+autopi2018
+Script Location:
+/opt/autopi/salt/modules/
+Get script status:
+sudo less -p ABRP /var/log/salt/minion

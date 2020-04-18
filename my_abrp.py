@@ -1,9 +1,8 @@
 import time
 import logging
 import json
-import urllib
+import requests,urllib
 import re
-import obd
 import traceback
 from datetime import datetime
 import os
@@ -17,20 +16,29 @@ log = logging.getLogger(__name__)
 ###################################################################################################
 abrp_apikey = '6f6a554f-d8c8-4c72-8914-d5895f58b1eb'
 
+last_data = {}
+last_data_time = time.time()
+debug = True
+
 def tlm(test=False,testdata=None, token=None, car_model=None):
+  global first_run_time
+  safelog("========> Initializing ABRP Script <========",always=True)
   while(True):
     modtime = datetime.fromtimestamp(os.stat(os.path.abspath(__file__)).st_mtime)
     if modtime > first_run_time:
-      safelog("ABRP Script has been updated, restarting to incorporate updates.")
+      safelog("ABRP Script has been updated, restarting to incorporate updates.",always=True)
       os._exit(1)
     try:
       get_tlm(test=test,testdata=testdata,token=token,car_model=car_model)
-    except Exception as e:
-      safelog(traceback.format_exc(e))
-      quit()
-    time.sleep(2.5)
+    except Exception:
+      safelog(traceback.format_exc(), always=True)
+      os._exit(1)
+    time.sleep(2)
 
 def get_tlm(test=False,testdata=None,token=None,car_model=None):
+  global last_data
+  global last_data_time
+  global abrp_apikey
   data = {}
   location = None
   if test:
@@ -75,28 +83,44 @@ def get_tlm(test=False,testdata=None,token=None,car_model=None):
     data['elevation'] = location['alt']
     data['heading'] = location['cog']
 
-  if token and car_model and "lat" in data and "soc" in data and "power" in data:
-
+  if not (token and car_model):
+    safelog("Token or Car Model missing from job kwargs")
+    return None
+  
+  if "soc" in data and "power" in data:
     params = {'token': token, 'api_key': abrp_apikey, 'tlm': json.dumps(data, separators=(',',':'))}
-
     url = 'https://api.iternio.com/1/tlm/send?'+urllib.urlencode(params)
 
-    try:
-      res = urllib.urlopen(url)
-      status = json.loads(res.read())
-      # status = requests.get(url)
-    except:
-      status = None
-    if test:
-      print(str(data))
-      print(url)
-      print(str(status))
+    min_changed = ["soc","power","is_charging"]
+    should_send = False
+    for param in min_changed:
+      if param in data and param   in last_data and data[param] != last_data[param]:
+        should_send = True
+        break
+    if "is_charging" in data and data["is_charging"] and time.time() - last_data_time > 100:
+      should_send = True
+    elif "is_charging" in data and not data["is_charging"] and time.time() - last_data_time > 30:
+      should_send = True
+    elif last_data == {}:
+      should_send = True
+    
+    safelog("Sending: "+str(should_send))
+    safelog(last_data)
+    if should_send:
+      try:
+        status = requests.get(url)
+        last_data = data
+        last_data_time = time.time()
+        safelog(url)
+        safelog(status)
+        safelog(status.text)
+      except:
+        status = None
     else:
-      log.info(str(data))
-      log.info (url)
-      log.info(str(status))
+      safelog("Not sending data, hasn't changed recently enough.")
   else:
-    safelog("Token or Car Model missing from job kwargs")
+    safelog("Not sending data, missing soc, or power")
+    safelog(data)
 
 ###################################################################################################
 # Following are methods for retrieving data from the car
@@ -244,14 +268,21 @@ def check_formula(formula):
   mdata = "7E81014490201314731"
   eval(formula)
 
-def safelog(text):
-  try:
-    log(text)
-  except:
-    print(text)
+def safelog(text,always=False):
+  global debug
+  if debug or always:
+    try:
+      text = "ABRP Script: "+str(text)
+      log.info(text)
+    except:
+      print(text)
 
 if __name__ == "__main__":
+  global debug
+  debug = True
   print "Running from command line."
+  last_data = {}
+  last_data_time = time.time()
   pids = get_pids("bolt:17:60")
   # pids = get_pids("kona:19")
   for pid in pids:
@@ -261,8 +292,4 @@ if __name__ == "__main__":
 
   tlm(test=True,testdata={"soc": 88.4, "soh":100, "voltage":388.0, "current": 40,
     "is_charging": 0, "ext_temp":20, "batt_temp": 20, "lat":29.5641, "lon":-95.0255, "speed":113.2
-  },token="test",car_model='chevy:bolt:17:60:other')
-  
-  tlm(test=True,testdata={"soc": 88.4, "soh":100, "voltage":388.0, "current": 0,
-    "is_charging": 0, "ext_temp":20, "batt_temp": 20, "lat":29.5641, "lon":-95.0255, "speed":0
   },token="test",car_model='chevy:bolt:17:60:other')

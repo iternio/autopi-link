@@ -3,4 +3,4 @@ autopi2018
 Script Location:
 /opt/autopi/salt/modules/
 Get script status:
-sudo less -p ABRP /var/log/salt/minion
+sudo tail -f /var/log/salt/minion | grep ABRP

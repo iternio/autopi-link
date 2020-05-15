@@ -16,13 +16,20 @@ log = logging.getLogger(__name__)
 ###################################################################################################
 abrp_apikey = '6f6a554f-d8c8-4c72-8914-d5895f58b1eb'
 
+# Should probably make this into a class...
 last_data = {}
 last_data_time = time.time()
-debug = True
+global_debug = False
+last_sleep_time = time.time()
 
-def tlm(test=False,testdata=None, token=None, car_model=None):
+
+def tlm(test=False,testdata=None, token=None, car_model=None, debug=False):
   global first_run_time
+  global global_debug
+  global_debug = debug
   safelog("========> Initializing ABRP Script <========",always=True)
+  safelog("car_model="+car_model,always=True)
+  manage_sleep({},force=True) # Force the device to stay awake for at least a few minutes
   while(True):
     modtime = datetime.fromtimestamp(os.stat(os.path.abspath(__file__)).st_mtime)
     if modtime > first_run_time:
@@ -33,7 +40,6 @@ def tlm(test=False,testdata=None, token=None, car_model=None):
     except Exception:
       safelog(traceback.format_exc(), always=True)
       os._exit(1)
-    time.sleep(2)
 
 def get_tlm(test=False,testdata=None,token=None,car_model=None):
   global last_data
@@ -50,13 +56,14 @@ def get_tlm(test=False,testdata=None,token=None,car_model=None):
       pass
     # Get all available telemetry from the car:
     pids = get_pids(car_model)
+    start = time.time()
     for p in pids:
       (mode,pid,formula,header) = parse_pid_entry(pids[p])
       try:
         data[p] = get_obd(p,mode,pid,formula,header)
       except:
         pass
-  
+    safelog("Retrieving PIDs took: "+str(time.time() - start))
   if data != {}:
     if "speed" not in data and location is not None:
       data['speed'] = location['sog_km']
@@ -71,7 +78,11 @@ def get_tlm(test=False,testdata=None,token=None,car_model=None):
         data[s] = 0
     if "power" not in data and "current" in data and "voltage" in data:
       data["power"] = float(data["current"]) * float(data["voltage"]) / 1000.0 #kW
-  
+    if "charge_voltage" in data and "charge_current" in data and round(data["charge_current"]) != 0:
+      if data["charge_current"] > 0:
+        data["charge_current"] *= -1
+      data["power"] = float(data["charge_current"]) * float(data["charge_voltage"]) / 1000.0
+      safelog("Using charge power instead of raw value")
   # utc - Current UTC timestamp in seconds
   data['utc'] = time.time()
   data["car_model"] = car_model
@@ -82,11 +93,16 @@ def get_tlm(test=False,testdata=None,token=None,car_model=None):
     data['lon'] = location['lon']
     data['elevation'] = location['alt']
     data['heading'] = location['cog']
+  elif car_model == "emulator":
+    data['lat'] = 28.608321
+    data['lon'] = -80.604153
 
   if not (token and car_model):
     safelog("Token or Car Model missing from job kwargs")
     return None
   
+  manage_sleep(data)
+
   if "soc" in data and "power" in data:
     params = {'token': token, 'api_key': abrp_apikey, 'tlm': json.dumps(data, separators=(',',':'))}
     url = 'https://api.iternio.com/1/tlm/send?'+urllib.urlencode(params)
@@ -135,18 +151,48 @@ def get_obd(name,mode=None,pid=None,formula=None,header=None):
     header = "7E4"
   if not formula:
     formula = "message.data"
-  kwargs = {
-    'mode': mode,
-    'pid': pid,
-    'header': header,
-    'formula': formula,
-    'verify': False,
-    'force': True,
-  }
-  # log.info ("get_obd inputs:" + str(kwargs))
+  if mode is None and pid is not None:
+    # using emulator, simpler call:
+    args = [pid]
+    kwargs = {}
+  else:
+    kwargs = {
+      'mode': mode,
+      'pid': pid,
+      'header': header,
+      'formula': formula,
+      'verify': False,
+      'force': True,
+    }
+  
   return __salt__['obd.query'](*args, **kwargs)['value']
 
 
+###################################################################################################
+# Following are methods for managing wake/sleep
+
+def manage_sleep(data, force=False):
+  global last_sleep_time
+  if time.time() - last_sleep_time < 60 and not force:
+    safelog("Not updating sleep timer.")
+    return
+  else:
+    last_sleep_time = time.time()
+  should_be_awake = False
+  if not force:
+    if 'power' in data and round(data['power']) != 0:
+      should_be_awake = True
+    elif 'speed' in data and round(data['speed']) != 0:
+      should_be_awake = True
+    elif 'is_charging' in data and data['is_charging']:
+      should_be_awake = True
+  else:
+    # Force to be awake
+    should_be_awake = True
+  if should_be_awake:
+    # clear all sleep timers and re-set timers for fail-safe.
+    safelog("Should be awake:" +str(should_be_awake) + ' - Resetting sleep timer')
+    __salt__['power.sleep_timer'](*[],**{'clear': '*', 'add': 'ABRP Sleep Timer', 'period': 600, 'reason': 'Vehicle inactive'})
 
 ###############################################################################
 # Define functions to retrieve the PIDs (Modes and Codes) for each vehicle
@@ -162,6 +208,9 @@ bit = re.compile(r'\{(\d+):(\d+)\}')
 signed = re.compile(r'\{([us]+):([\d:]+)\}')
 
 def parse_pid_entry(pid):
+  if "," not in pid:
+    # Using the emulator values:
+    return (None, pid, None, None)
   (mode,pid,formula,header) = re.split(",",pid)
   variables = var.findall(formula)
   if variables:
@@ -229,8 +278,10 @@ def get_pids(car_model):
     pids = {
       'soc':        "22,8334,({1}*100.0/255.0),7E4",
       'soh':        "22,41a3,({us:1:2})/18.0,7E4",
-      'voltage':    "22,2885,({us:1:2})/100.0,7E1",
+      'voltage':    "22,2885,({us:1:2})/2,7E1",
+      'charge_voltage': "22,436B,({us:1:2})/2.0,7E4",
       'current':    "22,2414,({s:1:2})/20.0,7E1",
+      'charge_current': "22,436C,({s:1:2})/20.0,7E4",
       # 'speed':      "22,000D,{1},7E0",
       'is_charging':"22,436c,({s:1:2})/20.0,7E4",
       'ext_temp':   "22,801E,({1}/2)-40.0,7E4",
@@ -246,6 +297,17 @@ def get_pids(car_model):
       'is_charging':"220,101,{10:0}-{51:2},7E4", # 7th bit in the byte is charging status
       'ext_temp':   "220,100,({7}/2.0)-40.0,7B3",
       'batt_temp':  "220,101,{s:17},7E4",
+    }
+  elif car_model == 'emulator':
+    pids = {
+      # Emulator uses basic mode 01 PIDs for now, engine tab on the Freematics Emulator
+      'soc':        "ABSOLUTE_LOAD", # Absolute Load Value
+      'voltage':    "RPM", # Engine RPM
+      'current':    "COOLANT_TEMP", # Engine Temperature
+      'charge_voltage':    "RPM", # Engine RPM
+      'charge_current':    "OIL_TEMP", # Engine Oil Temp
+      'is_charging':"TIMING_ADVANCE", # Timing Advance
+      'speed':      "SPEED", # Vehicle Speed
     }
   return pids
 
@@ -269,8 +331,8 @@ def check_formula(formula):
   eval(formula)
 
 def safelog(text,always=False):
-  global debug
-  if debug or always:
+  global global_debug
+  if global_debug or always:
     try:
       text = "ABRP Script: "+str(text)
       log.info(text)
@@ -278,17 +340,18 @@ def safelog(text,always=False):
       print(text)
 
 if __name__ == "__main__":
-  global debug
-  debug = True
+  global global_debug
+  global_debug = True
   print "Running from command line."
   last_data = {}
   last_data_time = time.time()
-  pids = get_pids("bolt:17:60")
+  pids = get_pids("emulator")
   # pids = get_pids("kona:19")
   for pid in pids:
     print (pid,parse_pid_entry(pids[pid]))
     (mode,pid,formula,header) = parse_pid_entry(pids[pid])
-    check_formula(formula)
+    if formula is not None:
+      check_formula(formula)
 
   tlm(test=True,testdata={"soc": 88.4, "soh":100, "voltage":388.0, "current": 40,
     "is_charging": 0, "ext_temp":20, "batt_temp": 20, "lat":29.5641, "lon":-95.0255, "speed":113.2

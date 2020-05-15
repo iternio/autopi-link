@@ -56,20 +56,23 @@ def get_tlm(test=False,testdata=None,token=None,car_model=None):
       pass
     # Get all available telemetry from the car:
     pids = get_pids(car_model)
-    start = time.time()
+    if pids == {}:
+      safelog("No PIDs found for car_model: "+car_model)
+      os._exit(1)
     for p in pids:
       (mode,pid,formula,header) = parse_pid_entry(pids[p])
       try:
         data[p] = get_obd(p,mode,pid,formula,header)
       except:
         pass
-    safelog("Retrieving PIDs took: "+str(time.time() - start))
   if data != {}:
     if "speed" not in data and location is not None:
       data['speed'] = location['sog_km']
     if "is_charging" in data and data["is_charging"] != 0:
       # Standardize the "is_charging" parameters, not all cars have simple bool
       data["is_charging"] = 1
+    else:
+      data["is_charging"] = 0
     for s in ["soh", "soc"]:
       # Constrain SOH and SOC to realistic values.
       if s in data and data[s] > 100:
@@ -78,11 +81,21 @@ def get_tlm(test=False,testdata=None,token=None,car_model=None):
         data[s] = 0
     if "power" not in data and "current" in data and "voltage" in data:
       data["power"] = float(data["current"]) * float(data["voltage"]) / 1000.0 #kW
-    if "charge_voltage" in data and "charge_current" in data and round(data["charge_current"]) != 0:
+    if data["is_charging"] and "charge_voltage" in data and "charge_current" in data and round(data["charge_current"]) != 0:
       if data["charge_current"] > 0:
         data["charge_current"] *= -1
       data["power"] = float(data["charge_current"]) * float(data["charge_voltage"]) / 1000.0
+      data["voltage"] = float(data["charge_voltage"])
+      data["current"] = float(data["charge_current"])
       safelog("Using charge power instead of raw value")
+    if "charge_voltage" in data:
+      del data["charge_voltage"]
+    if "charge_current" in data:
+      del data["charge_current"]
+  # Truncate data to reduce bandwidth usage
+  for d in ['soc','soh','capacity','voltage','current','power','ext_temp','batt_temp']:
+    if d in data:
+      data[d] = round(data[d]*10)/10
   # utc - Current UTC timestamp in seconds
   data['utc'] = time.time()
   data["car_model"] = car_model
@@ -91,7 +104,7 @@ def get_tlm(test=False,testdata=None,token=None,car_model=None):
   if location is not None:
     data['lat'] = location['lat']
     data['lon'] = location['lon']
-    data['elevation'] = location['alt']
+    # data['elevation'] = location['alt'] # Don't trust GPS elevation, do lookup instead
     data['heading'] = location['cog']
   elif car_model == "emulator":
     data['lat'] = 28.608321
@@ -277,8 +290,8 @@ def get_pids(car_model):
   if car_model in ["chevy:bolt:17:60:other","chevy:bolt:20:66","opel:ampera-e:17:60:other"]:
     pids = {
       'soc':        "22,8334,({1}*100.0/255.0),7E4",
-      'soh':        "22,41a3,({us:1:2})/18.0,7E4",
-      'voltage':    "22,2885,({us:1:2})/2,7E1",
+      'capacity':        "22,41a3,({us:1:2})/30.0,7E4",
+      'voltage':    "22,2885,({us:1:2})/100.0,7E1",
       'charge_voltage': "22,436B,({us:1:2})/2.0,7E4",
       'current':    "22,2414,({s:1:2})/20.0,7E1",
       'charge_current': "22,436C,({s:1:2})/20.0,7E4",
@@ -290,7 +303,7 @@ def get_pids(car_model):
   elif car_model in ["hyundai:kona:19:64:other","hyundai:kona:19:39:other"]:
     pids = {
       'soc':        "220,105,({32}/2.0),7E4",
-      'soh':        "220,105,({us:26:27})/10.0,7E4",
+      'soh':   "220,105,({us:26:27})/10.0,7E4",
       'voltage':    "220,101,({us:13:14})/10.0,7E4",
       'current':    "220,101,({s:11:12})/10.0,7E4", 
       # 'speed':      "220,100,'{30}',7B3",

@@ -287,7 +287,7 @@ def get_pids(car_model):
   #   A*256+B -> {us:1:2}
   #   {J:0} -> {10:0}
   
-  if car_model in ["chevy:bolt:17:60:other","chevy:bolt:20:66","opel:ampera-e:17:60:other"]:
+  if car_model in ["chevy:bolt:17:60:other","chevy:bolt:20:66",'chevy:spark:14:19:other',"opel:ampera-e:17:60:other"]:
     pids = {
       'soc':        "22,8334,({1}*100.0/255.0),7E4",
       'capacity':        "22,41a3,({us:1:2})/30.0,7E4",

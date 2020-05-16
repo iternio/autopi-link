@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<defaults>
+	<param id="0104" value="50"/>
+	<param id="0105" value="5"/>
+	<param id="010A" value="150"/>
+	<param id="010B" value="100"/>
+	<param id="010C" value="400"/>
+	<param id="010D" value="100"/>
+	<param id="010E" value="0"/>
+	<param id="010F" value="20"/>
+	<param id="0110" value="80"/>
+	<param id="0111" value="20"/>
+	<param id="0122" value="200"/>
+	<param id="012F" value="75"/>
+	<param id="0133" value="101"/>
+	<param id="0143" value="88"/>
+	<param id="0146" value="25"/>
+	<param id="015C" value="0"/>
+	<param id="015E" value="20"/>
+	<param id="0161" value="90"/>
+	<param id="0162" value="50"/>
+	<param id="0163" value="240"/>
+	<param id="0168" value="70"/>
+</defaults>

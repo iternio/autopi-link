@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="utf-8"?>
+<params>
+  <group name="EV Data">
+    <param id="010D">
+      <name>Vehicle Speed (010D)</name>
+      <unit>km/h</unit>
+      <min>0</min>
+      <max>240</max>
+    </param>
+    <param id="0143">
+      <name>SoC (0143)</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>100</max>
+    </param>
+    <param id="010C">
+      <name>Voltage (010C)</name>
+      <unit>V</unit>
+      <min>0</min>
+      <max>1000</max>
+    </param>
+    <param id="0105">
+      <name>Current (0105)</name>
+      <unit>A</unit>
+      <min>-40</min>
+      <max>200</max>
+    </param>
+    <param id="015C">
+      <name>Charge Current (015C)</name>
+      <unit>A</unit>
+      <min>-40</min>
+      <max>200</max>
+    </param>
+    <param id="010E">
+      <name>Is Charging</name>
+      <unit>n/a</unit>
+      <min>-2</min>
+      <max>2</max>
+    </param>
+  </group>
+  <group name="Engine">
+    <param id="010C">
+      <name>Main Voltage</name>
+      <unit>rpm</unit>
+      <min>0</min>
+      <max>9999</max>
+    </param>
+    <param id="0105">
+      <name>Main Current</name>
+      <unit>°C</unit>
+      <min>-40</min>
+      <max>200</max>
+    </param>
+    <param id="0111">
+      <name>Throttle Position</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>100</max>
+    </param>
+    <param id="010E">
+      <name>Is Charging</name>
+      <unit>°</unit>
+      <min>-64</min>
+      <max>63</max>
+    </param>
+    <param id="0104">
+      <name>Calculated Engine Load</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>100</max>
+    </param>
+    <param id="0143">
+      <name>SoC</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>100</max>
+    </param>
+    <param id="015C">
+      <name>Charge Current</name>
+      <unit>°C</unit>
+      <min>-40</min>
+      <max>210</max>
+    </param>
+    <param id="0161">
+      <name>Demand Engine Torque</name>
+      <unit>%</unit>
+      <min>-125</min>
+      <max>125</max>
+    </param>
+    <param id="0162">
+      <name>Actual Engine Torque</name>
+      <unit>%</unit>
+      <min>-125</min>
+      <max>125</max>
+    </param>
+    <param id="0163">
+      <name>Engine Reference Torque</name>
+      <unit>Nm</unit>
+      <min>0</min>
+      <max>65535</max>
+    </param>
+  </group>
+  <group name="Throttle">
+    <param id="0111">
+      <name>Throttle Position</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>100</max>
+    </param>
+    <param id="0145">
+      <name>Relative Throttle Position</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>100</max>
+    </param>
+    <param id="0147">
+      <name>Absolute Throttle Position B</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>100</max>
+    </param>
+    <param id="0148">
+      <name>Absolute Throttle Position C</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>100</max>
+    </param>
+    <param id="0149">
+      <name>Absolute Pedal Position D</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>100</max>
+    </param>
+    <param id="014A">
+      <name>Absolute Pedal Position E</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>100</max>
+    </param>
+    <param id="014B">
+      <name>Absolute Pedal Position F</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>100</max>
+    </param>
+    <param id="014C">
+      <name>Commanded Throttle Actuator</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>100</max>
+    </param>
+    <param id="015A">
+      <name>Relative Accelerator Pedal Position</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>100</max>
+    </param>
+  </group>
+  <group name="Air/Fuel">
+    <param id="010B">
+      <name>Intake MAP</name>
+      <unit>kPa</unit>
+      <min>0</min>
+      <max>255</max>
+    </param>
+    <param id="010F">
+      <name>Intake Air Temperature</name>
+      <unit>kPa</unit>
+      <min>-40</min>
+      <max>215</max>
+    </param>
+    <param id="0110">
+      <name>MAF Air Flow Rate</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>655</max>
+    </param>
+    <param id="0133">
+      <name>Barometric Pressure</name>
+      <unit>kPa</unit>
+      <min>0</min>
+      <max>255</max>
+    </param>
+    <param id="010A">
+      <name>Fuel Pressure</name>
+      <unit>kPa</unit>
+      <default>0</default>
+      <min>0</min>
+      <max>765</max>
+    </param>
+    <param id="012F">
+      <name>Fuel Level Input</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>100</max>
+    </param>
+    <param id="0152">
+      <name>Ethanol Fuel</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>100</max>
+    </param>
+    <param id="015D">
+      <name>Fuel Injection Timing</name>
+      <unit>°</unit>
+      <min>-210</min>
+      <max>301</max>
+    </param>
+    <param id="015E">
+      <name>Engine Fuel Rate</name>
+      <unit>L/h</unit>
+      <min>0</min>
+      <max>3212</max>
+    </param>
+  </group>
+  <group name="Exhaust">
+    <param id="0122">
+      <name>Fuel Rail Pressure (relative)</name>
+      <unit>kPa</unit>
+      <min>0</min>
+      <max>5177</max>
+    </param>
+    <param id="0123">
+      <name>Fuel Rail Pressure (direct inject)</name>
+      <unit>kPa</unit>
+      <min>0</min>
+      <max>655350</max>
+    </param>
+    <param id="012C">
+      <name>Commanded EGR</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>100</max>
+    </param>
+    <param id="012D">
+      <name>EGR Error</name>
+      <unit>%</unit>
+      <min>-99</min>
+      <max>100</max>
+    </param>
+    <param id="012E">
+      <name>Commanded Evaporative Purge</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>100</max>
+    </param>
+    <param id="0132">
+      <name>Evap. System Vapor Pressure</name>
+      <unit>%</unit>
+      <min>0</min>
+      <max>100</max>
+    </param>
+    <param id="0168">
+      <name>Exhaust Gas Temperature</name>
+      <unit>°C</unit>
+      <min>-40</min>
+      <max>210</max>
+    </param>
+  </group>
+  <group name="Temperature">
+    <param id="0105">
+      <name>Engine Coolant Temperature</name>
+      <unit>°C</unit>
+      <min>0</min>
+      <max>200</max>
+    </param>
+    <param id="010F">
+      <name>Intake Air Temperature</name>
+      <unit>°C</unit>
+      <min>-40</min>
+      <max>215</max>
+    </param>
+    <param id="0146">
+      <name>Ambient Air Temperature</name>
+      <unit>°C</unit>
+      <min>-40</min>
+      <max>215</max>
+    </param>
+    <param id="015C">
+      <name>Charge Current</name>
+      <unit>°C</unit>
+      <min>-40</min>
+      <max>210</max>
+    </param>
+    <param id="0168">
+      <name>Exhaust Gas Temperature</name>
+      <unit>°C</unit>
+      <min>-40</min>
+      <max>210</max>
+    </param>
+    <param id="013C">
+      <name>Catalyst Temperature Bank 1 Sensor 1</name>
+      <unit>°C</unit>
+      <min>-40</min>
+      <max>6513</max>
+    </param>
+    <param id="013D">
+      <name>Catalyst Temperature Bank 2 Sensor 1</name>
+      <unit>°C</unit>
+      <min>-40</min>
+      <max>6513</max>
+    </param>
+    <param id="013E">
+      <name>Catalyst Temperature Bank 1 Sensor 2</name>
+      <unit>°C</unit>
+      <min>-40</min>
+      <max>6513</max>
+    </param>
+    <param id="013F">
+      <name>Catalyst Temperature Bank 2 Sensor 2</name>
+      <unit>°C</unit>
+      <min>-40</min>
+      <max>6513</max>
+    </param>
+  </group>
+  <group name="Readiness">
+    <readiness id="1" available="B0" complete="B4">
+      <name>Misfire</name>
+    </readiness>
+    <readiness id="2" available="B1" complete="B5">
+      <name>Fuel System</name>
+    </readiness>
+    <readiness id="3" available="B2" complete="B6">
+      <name>Components</name>
+    </readiness>
+    <readiness id="4" available="C0" complete="D0">
+      <name>Catalyst</name>
+    </readiness>
+    <readiness id="5" available="C1" complete="D1">
+      <name>Heated Catalyst</name>
+    </readiness>
+    <readiness id="6" available="C2" complete="D2">
+      <name>Evaporative System</name>
+    </readiness>
+    <readiness id="7" available="C3" complete="D3">
+      <name>Secondary Air System</name>
+    </readiness>
+    <readiness id="8" available="C4" complete="D4">
+      <name>A/C Refrigerant</name>
+    </readiness>
+    <readiness id="9" available="C5" complete="D5">
+      <name>Oxygen Sensor</name>
+    </readiness>
+    <readiness id="10" available="C6" complete="D6">
+      <name>Oxygen Sensor Heater</name>
+    </readiness>
+    <readiness id="11" available="C7" complete="D7">
+      <name>EGR System</name>
+    </readiness>
+  </group>
+</params>

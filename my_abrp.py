@@ -286,8 +286,15 @@ def get_pids(car_model):
   #   Signed(A)*256+B -> {s:1:2}
   #   A*256+B -> {us:1:2}
   #   {J:0} -> {10:0}
+  # If converting from an existing AutoPi script, just subtract two from the first position in your
+  # message.data[] statement:
+  # message.data[34:35] -> {32}
+  # message.data[3:4] -> {1}
+  # And then you can simplify your twos_comp and bytes_to_int by just calling the right version:
+  # {s:1:2} = twos_comp(bytes_to_int(message.data[3:4])*256 + bytes_to_int(message.data[4:5]),16)
+  # {us:1:2} = bytes_to_int(message.data[3:4])*256 + bytes_to_int(message.data[4:5]
   
-  if car_model in ["chevy:bolt:17:60:other","chevy:bolt:20:66",'chevy:spark:14:19:other',"opel:ampera-e:17:60:other"]:
+  if "chevy" in car_model or "opel" in car_model:
     pids = {
       'soc':        "22,8334,({1}*100.0/255.0),7E4",
       'capacity':        "22,41a3,({us:1:2})/30.0,7E4",
@@ -300,7 +307,7 @@ def get_pids(car_model):
       'ext_temp':   "22,801E,({1}/2)-40.0,7E4",
       'batt_temp':  "22,434F,({1}-40.0),7E4",
     }
-  elif car_model in ["hyundai:kona:19:64:other","hyundai:kona:19:39:other"]:
+  elif "hyundai" in car_model or "kia" in car_model:
     pids = {
       'soc':        "220,105,({32}/2.0),7E4",
       'soh':   "220,105,({us:26:27})/10.0,7E4",
@@ -358,11 +365,12 @@ if __name__ == "__main__":
   print "Running from command line."
   last_data = {}
   last_data_time = time.time()
-  pids = get_pids("emulator")
+  pids = get_pids("hyundai:kona:19:39:other")
   # pids = get_pids("kona:19")
-  for pid in pids:
-    print (pid,parse_pid_entry(pids[pid]))
-    (mode,pid,formula,header) = parse_pid_entry(pids[pid])
+  for name in pids:
+    print (name,parse_pid_entry(pids[name]))
+    (mode,pid,formula,header) = parse_pid_entry(pids[name])
+    print(name + "=" + formula)
     if formula is not None:
       check_formula(formula)
 

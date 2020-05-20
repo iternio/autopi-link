@@ -18,9 +18,10 @@ abrp_apikey = '6f6a554f-d8c8-4c72-8914-d5895f58b1eb'
 
 # Should probably make this into a class...
 last_data = {}
-last_data_time = time.time()
+last_data_time = time.time() - 600 # 10 minutes ago to ensure we check send on first run.
 global_debug = False
-last_sleep_time = time.time()
+command_line = False
+last_sleep_time = time.time() - 600 # 10 minutes ago, to ensure we check sleep on first run.
 
 
 def tlm(test=False,testdata=None, token=None, car_model=None, debug=False):
@@ -29,8 +30,13 @@ def tlm(test=False,testdata=None, token=None, car_model=None, debug=False):
   global_debug = debug
   safelog("========> Initializing ABRP Script <========",always=True)
   safelog("car_model="+car_model,always=True)
-  manage_sleep({},force=True) # Force the device to stay awake for at least a few minutes
+  last_run = 0
   while(True):
+    now = time.time()
+    next_run = last_run + 5
+    if now < next_run:
+      time.sleep(next_run - now)
+    last_run = time.time()
     modtime = datetime.fromtimestamp(os.stat(os.path.abspath(__file__)).st_mtime)
     if modtime > first_run_time:
       safelog("ABRP Script has been updated, restarting to incorporate updates.",always=True)
@@ -113,9 +119,6 @@ def get_tlm(test=False,testdata=None,token=None,car_model=None):
   if not (token and car_model):
     safelog("Token or Car Model missing from job kwargs")
     return None
-  
-  manage_sleep(data)
-
   if "soc" in data and "power" in data:
     params = {'token': token, 'api_key': abrp_apikey, 'tlm': json.dumps(data, separators=(',',':'))}
     url = 'https://api.iternio.com/1/tlm/send?'+urllib.urlencode(params)
@@ -134,7 +137,7 @@ def get_tlm(test=False,testdata=None,token=None,car_model=None):
       should_send = True
     
     safelog("Sending: "+str(should_send))
-    safelog(last_data)
+    safelog(data)
     if should_send:
       try:
         status = requests.get(url)
@@ -150,6 +153,8 @@ def get_tlm(test=False,testdata=None,token=None,car_model=None):
   else:
     safelog("Not sending data, missing soc, or power")
     safelog(data)
+  # Manage sleep as the last thing in the script.
+  manage_sleep(data)
 
 ###################################################################################################
 # Following are methods for retrieving data from the car
@@ -187,7 +192,6 @@ def get_obd(name,mode=None,pid=None,formula=None,header=None):
 def manage_sleep(data, force=False):
   global last_sleep_time
   if time.time() - last_sleep_time < 60 and not force:
-    safelog("Not updating sleep timer.")
     return
   else:
     last_sleep_time = time.time()
@@ -199,14 +203,20 @@ def manage_sleep(data, force=False):
       should_be_awake = True
     elif 'is_charging' in data and data['is_charging']:
       should_be_awake = True
+    else:
+      # Kill script, gives us 60 seconds to wait and check again.
+      safelog("Car not active, retrying in 60 seconds", always=True)
+      os._exit(1)
   else:
     # Force to be awake
     should_be_awake = True
   if should_be_awake:
     # clear all sleep timers and re-set timers for fail-safe.
     safelog("Should be awake:" +str(should_be_awake) + ' - Resetting sleep timer')
-    __salt__['power.sleep_timer'](*[],**{'clear': '*', 'add': 'ABRP Sleep Timer', 'period': 600, 'reason': 'Vehicle inactive'})
-
+    try:
+      __salt__['power.sleep_timer'](*[],**{'clear': '*', 'add': 'ABRP Sleep Timer', 'period': 600, 'reason': 'Vehicle inactive'})
+    except:
+      pass
 ###############################################################################
 # Define functions to retrieve the PIDs (Modes and Codes) for each vehicle
 
@@ -292,9 +302,9 @@ def get_pids(car_model):
   # message.data[3:4] -> {1}
   # And then you can simplify your twos_comp and bytes_to_int by just calling the right version:
   # {s:1:2} = twos_comp(bytes_to_int(message.data[3:4])*256 + bytes_to_int(message.data[4:5]),16)
-  # {us:1:2} = bytes_to_int(message.data[3:4])*256 + bytes_to_int(message.data[4:5]
-  
-  if "chevy" in car_model or "opel" in car_model:
+  # {us:1:2} = bytes_to_int(message.data[3:4])*256 + bytes_to_int(message.data[4:5])
+  tc = TypeCode(car_model)
+  if tc.make in ["chevy","opel"]:
     pids = {
       'soc':            "22,8334,({1}*100.0/255.0),7E4",
       'capacity':       "22,41a3,({us:1:2})/30.0,7E4",
@@ -307,17 +317,28 @@ def get_pids(car_model):
       'ext_temp':       "22,801E,({1}/2)-40.0,7E4",
       'batt_temp':      "22,434F,({1}-40.0),7E4",
     }
-  elif "hyundai" in car_model or "kia" in car_model:
-    pids = {
-      'soc':        "220,105,({32}/2.0),7E4",
-      'soh':        "220,105,({us:26:27})/10.0,7E4",
-      'voltage':    "220,101,({us:13:14})/10.0,7E4",
-      'current':    "220,101,({s:11:12})/10.0,7E4", 
-      # 'speed':      "220,100,'{30}',7B3",
-      'is_charging':"220,101,{10:0}-{51:2},7E4", # 7th bit in the byte is charging status
-      'ext_temp':   "220,100,({7}/2.0)-40.0,7B3",
-      'batt_temp':  "220,101,{s:17},7E4",
-    }
+  elif tc.make in ["hyundai", "kia"]:
+    if int(tc.year) >= 19:
+      pids = {
+        'soc':        "220,105,({32}/2.0),7E4",
+        'soh':        "220,105,({us:26:27})/10.0,7E4",
+        'voltage':    "220,101,({us:13:14})/10.0,7E4",
+        'current':    "220,101,({s:11:12})/10.0,7E4", 
+        'is_charging':"220,101,int(not {51:2}),7E4",
+        'ext_temp':   "220,100,({7}/2.0)-40.0,7B3",
+        'batt_temp':  "220,101,{s:17},7E4",
+      }
+    elif int(tc.year) < 19:
+      # older cars
+      pids = {
+        'soc':        "2,105,({32}/2.0),7E4",
+        'soh':        "2,105,({us:26:27})/10.0,7E4",
+        'voltage':    "2,101,({us:13:14})/10.0,7E4",
+        'current':    "2,101,({s:11:12})/10.0,7E4", 
+        'is_charging':"2,101,int(not {51:2}),7E4",
+        'ext_temp':   "2,100,({7}/2.0)-40.0,7B3",
+        'batt_temp':  "2,101,({s:17}),7E4", # Average the modules?
+      }
   elif car_model == 'emulator':
     pids = {
       # Emulator uses basic mode 01 PIDs for now, engine tab on the Freematics Emulator
@@ -352,25 +373,42 @@ def check_formula(formula):
 
 def safelog(text,always=False):
   global global_debug
+  global command_line
   if global_debug or always:
     try:
       text = "ABRP Script: "+str(text)
       log.info(text)
+      if command_line:
+        print(text)
     except:
       print(text)
 
+class TypeCode:
+  def __init__(self, typecode):
+    self.code = typecode
+    self.array = self.code.split(":")
+    self.manufacturer = self.array[0]
+    self.make = self.array[0]
+    if len(self.array) > 1:
+      self.model = self.array[1]
+      self.year = self.array[2]
+      self.battery = self.array[3]
+      if len(self.array) > 4: 
+        self.options = self.array[4:]
+      else:
+        self.options = []
+
 if __name__ == "__main__":
-  global global_debug
   global_debug = True
+  command_line = True
   print "Running from command line."
   last_data = {}
   last_data_time = time.time()
-  pids = get_pids("hyundai:kona:19:39:other")
+  pids = get_pids("hyundai:ioniq:14:33:other")
   # pids = get_pids("kona:19")
   for name in pids:
-    print (name,parse_pid_entry(pids[name]))
     (mode,pid,formula,header) = parse_pid_entry(pids[name])
-    print(name + "=" + formula)
+    print(name + "=" + mode + "," + pid + "=" + formula)
     if formula is not None:
       check_formula(formula)
 

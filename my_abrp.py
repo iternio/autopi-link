@@ -98,6 +98,8 @@ def get_tlm(test=False,testdata=None,token=None,car_model=None):
       del data["charge_voltage"]
     if "charge_current" in data:
       del data["charge_current"]
+    if "is_charging" in data and data["is_charging"] and "power" in data and int(data['power']) == 0:
+      data["is_charging"] = 0 # Ignore non-charge events.
   # Truncate data to reduce bandwidth usage
   for d in ['soc','soh','capacity','voltage','current','power','ext_temp','batt_temp']:
     if d in data:
@@ -203,10 +205,6 @@ def manage_sleep(data, force=False):
       should_be_awake = True
     elif 'is_charging' in data and data['is_charging']:
       should_be_awake = True
-    else:
-      # Kill script, gives us 60 seconds to wait and check again.
-      safelog("Car not active, retrying in 60 seconds", always=True)
-      os._exit(1)
   else:
     # Force to be awake
     should_be_awake = True

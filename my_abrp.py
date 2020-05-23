@@ -121,7 +121,7 @@ def get_tlm(test=False,testdata=None,token=None,car_model=None):
   if not (token and car_model):
     safelog("Token or Car Model missing from job kwargs")
     return None
-  if "soc" in data and "power" in data:
+  if "soc" in data:
     params = {'token': token, 'api_key': abrp_apikey, 'tlm': json.dumps(data, separators=(',',':'))}
     url = 'https://api.iternio.com/1/tlm/send?'+urllib.urlencode(params)
 
@@ -305,15 +305,15 @@ def get_pids(car_model):
   if tc.make in ["chevy","opel"]:
     pids = {
       'soc':            "22,8334,({1}*100.0/255.0),7E4",
-      'capacity':       "22,41a3,({us:1:2})/30.0,7E4",
+      'capacity':       "22,41A3,({us:1:2})/30.0,7E4",
       'voltage':        "22,2885,({us:1:2})/100.0,7E1",
       'charge_voltage': "22,436B,({us:1:2})/2.0,7E4",
       'current':        "22,2414,({s:1:2})/20.0,7E1",
       'charge_current': "22,436C,({s:1:2})/20.0,7E4",
-      # 'speed':      "22,000D,{1},7E0",
-      'is_charging':    "22,436c,({s:1:2})/20.0,7E4",
+      'is_charging':    "22,436C,({s:1:2})/20.0,7E4",
       'ext_temp':       "22,801E,({1}/2)-40.0,7E4",
       'batt_temp':      "22,434F,({1}-40.0),7E4",
+      #'odometer':       "A6,166,({us:1:4})/10,???"
     }
   elif tc.make in ["hyundai", "kia"]:
     if int(tc.year) >= 19:
@@ -325,6 +325,7 @@ def get_pids(car_model):
         'is_charging':"220,101,int(not {51:2}),7E4",
         'ext_temp':   "220,100,({7}/2.0)-40.0,7B3",
         'batt_temp':  "220,101,{s:17},7E4",
+        #'odometer':   "22,B002,{us:9:12},7C6" # Need to add 3-byte support.
       }
     elif int(tc.year) < 19:
       # older cars
@@ -336,6 +337,7 @@ def get_pids(car_model):
         'is_charging':"2,101,int(not {51:2}),7E4",
         'ext_temp':   "2,100,({7}/2.0)-40.0,7B3",
         'batt_temp':  "2,101,({s:17}),7E4", # Average the modules?
+        #'odometer':   "22,B002,{us:11:14},7C6"
       }
   elif car_model == 'emulator':
     pids = {

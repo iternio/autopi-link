@@ -199,11 +199,11 @@ def manage_sleep(data, force=False):
     last_sleep_time = time.time()
   should_be_awake = False
   if not force:
-    if 'power' in data and abs(data['power']) > 0.3:
+    if 'is_charging' in data and data['is_charging']:
       should_be_awake = True
     elif 'speed' in data and round(data['speed']) != 0:
       should_be_awake = True
-    elif 'is_charging' in data and data['is_charging']:
+    elif 'power' in data and abs(data['power']) > 0.3:
       should_be_awake = True
   else:
     # Force to be awake

@@ -7,214 +7,133 @@ import traceback
 from datetime import datetime
 import os
 
-first_run_time = datetime.now()
-
 # Structure and lots of initial work from @plord12 on GitHub:
 # https://github.com/plord12/autopi-tools
 
 log = logging.getLogger(__name__)
-###################################################################################################
-abrp_apikey = '6f6a554f-d8c8-4c72-8914-d5895f58b1eb'
-
-# Should probably make this into a class...
-last_data = {}
-last_data_time = time.time() - 600 # 10 minutes ago to ensure we check send on first run.
 global_debug = False
-command_line = False
-last_sleep_time = time.time() - 600 # 10 minutes ago, to ensure we check sleep on first run.
+first_run_time = datetime.now()
+def check_restart():
+  modtime = datetime.fromtimestamp(os.stat(os.path.abspath(__file__)).st_mtime)
+  if modtime > first_run_time:
+    safelog("Script has been updated, restarting to incorporate updates.",always=True)
+    os._exit(1)
 
 
 def tlm(test=False,testdata=None, token=None, car_model=None, debug=False):
-  global first_run_time
   global global_debug
   global_debug = debug
   safelog("========> Initializing ABRP Script <========",always=True)
   safelog("car_model="+car_model,always=True)
   last_run = 0
+  poller = Poller(car_model,token)
   while(True):
     now = time.time()
     next_run = last_run + 5
     if now < next_run:
       time.sleep(next_run - now)
     last_run = time.time()
-    modtime = datetime.fromtimestamp(os.stat(os.path.abspath(__file__)).st_mtime)
-    if modtime > first_run_time:
-      safelog("ABRP Script has been updated, restarting to incorporate updates.",always=True)
-      os._exit(1)
+    check_restart()
     try:
-      get_tlm(test=test,testdata=testdata,token=token,car_model=car_model)
+      poller.get_tlm()
     except Exception:
       safelog(traceback.format_exc(), always=True)
       os._exit(1)
 
-def get_tlm(test=False,testdata=None,token=None,car_model=None):
-  global last_data
-  global last_data_time
-  global abrp_apikey
-  data = {}
-  location = None
-  if test:
-    data = testdata
-  else:
-    try:
-      location = get_location()
-    except:
-      pass
-    # Get all available telemetry from the car:
-    pids = get_pids(car_model)
-    if pids == {}:
-      safelog("No PIDs found for car_model: "+car_model)
-      os._exit(1)
-    for p in pids:
-      (mode,pid,formula,header) = parse_pid_entry(pids[p])
-      try:
-        data[p] = get_obd(p,mode,pid,formula,header)
-      except:
-        pass
-  if data != {}:
-    if "speed" not in data and location is not None:
-      data['speed'] = location['sog_km']
-    if "is_charging" in data and data["is_charging"] != 0:
-      # Standardize the "is_charging" parameters, not all cars have simple bool
-      data["is_charging"] = 1
-    else:
-      data["is_charging"] = 0
-    for s in ["soh", "soc"]:
-      # Constrain SOH and SOC to realistic values.
-      if s in data and data[s] > 100:
-        data[s] = 100
-      elif s in data and data[s] < 0:
-        data[s] = 0
-    if "power" not in data and "current" in data and "voltage" in data:
-      data["power"] = float(data["current"]) * float(data["voltage"]) / 1000.0 #kW
-    if data["is_charging"] and "charge_voltage" in data and "charge_current" in data and round(data["charge_current"]) != 0:
-      if data["charge_current"] > 0:
-        data["charge_current"] *= -1
-      data["power"] = float(data["charge_current"]) * float(data["charge_voltage"]) / 1000.0
-      data["voltage"] = float(data["charge_voltage"])
-      data["current"] = float(data["charge_current"])
-      safelog("Using charge power instead of raw value")
-    if "charge_voltage" in data:
-      del data["charge_voltage"]
-    if "charge_current" in data:
-      del data["charge_current"]
-    if "is_charging" in data and data["is_charging"] and "power" in data and int(data['power']) == 0:
-      data["is_charging"] = 0 # Ignore non-charge events.
-  # Truncate data to reduce bandwidth usage
-  for d in ['soc','soh','capacity','voltage','current','power','ext_temp','batt_temp']:
-    if d in data:
-      data[d] = round(data[d]*10)/10
-  # utc - Current UTC timestamp in seconds
-  data['utc'] = time.time()
-  data["car_model"] = car_model
-  
-  # lat - User's current latitude
-  if location is not None:
-    data['lat'] = location['lat']
-    data['lon'] = location['lon']
-    # data['elevation'] = location['alt'] # Don't trust GPS elevation, do lookup instead
-    data['heading'] = location['cog']
-  elif car_model == "emulator":
-    data['lat'] = 28.608321
-    data['lon'] = -80.604153
 
-  if not (token and car_model):
-    safelog("Token or Car Model missing from job kwargs")
-    return None
-  if "soc" in data:
-    params = {'token': token, 'api_key': abrp_apikey, 'tlm': json.dumps(data, separators=(',',':'))}
-    url = 'https://api.iternio.com/1/tlm/send?'+urllib.urlencode(params)
-
-    min_changed = ["soc","power","is_charging"]
-    should_send = False
-    for param in min_changed:
-      if param in data and param   in last_data and data[param] != last_data[param]:
-        should_send = True
-        break
-    if "is_charging" in data and data["is_charging"] and time.time() - last_data_time > 100:
-      should_send = True
-    elif "is_charging" in data and not data["is_charging"] and time.time() - last_data_time > 30:
-      should_send = True
-    elif last_data == {}:
-      should_send = True
+class Poller():
+  def __init__(self, typecode, token):
+    self.apikey = '6f6a554f-d8c8-4c72-8914-d5895f58b1eb'
+    self.token = token
+    self.last_data_sent = {}
+    self.last_data_time = time.time() - 600 # 10 minutes ago to ensure we check send on first run.
+    self.last_sleep_time = time.time() - 600 # 10 minutes ago, to ensure we check sleep on first run.
     
-    safelog("Sending: "+str(should_send))
-    safelog(data)
-    if should_send:
-      try:
-        status = requests.get(url)
-        last_data = data
-        last_data_time = time.time()
-        safelog(url)
-        safelog(status)
-        safelog(status.text)
-      except:
-        status = None
+    self.tc = TypeCode(typecode)
+    if self.tc.make in ['chevy','opel']:
+      self.car = Chevy(typecode)
+    elif self.tc.make in ['hyundai','kia']:
+      self.car = HKMC(typecode)
     else:
-      safelog("Not sending data, hasn't changed recently enough.")
-  else:
-    safelog("Not sending data, missing soc, or power")
-    safelog(data)
-  # Manage sleep as the last thing in the script.
-  manage_sleep(data)
-
-###################################################################################################
-# Following are methods for retrieving data from the car
-def get_location():
-  args = []
-  kwargs = {}
-  return __salt__['ec2x.gnss_location'](*args, **kwargs)
-
-def get_obd(name,mode=None,pid=None,formula=None,header=None):
-  args = [name]
-  if not header:
-    header = "7E4"
-  if not formula:
-    formula = "message.data"
-  if mode is None and pid is not None:
-    # using emulator, simpler call:
-    args = [pid]
-    kwargs = {}
-  else:
-    kwargs = {
-      'mode': mode,
-      'pid': pid,
-      'header': header,
-      'formula': formula,
-      'verify': False,
-      'force': True,
-    }
+      self.car = CarOBD(typecode)
   
-  return __salt__['obd.query'](*args, **kwargs)['value']
+  def get_tlm(self):
+    self.car.get_location()
+    self.car.get_obd()
+    self.car.clean_up_data()
+    if not self.token:
+      safelog("Token or Car Model missing from job kwargs")
+      return None
+    if "soc" in self.car.data:
+      min_changed = ["soc","power","is_charging"]
+      should_send = False
+      for param in min_changed:
+        if param in self.car.data and param in self.last_data_sent and self.car.data[param] != self.last_data_sent[param]:
+          should_send = True
+          break
+      # Don't send if we're not charging or driving.
+      if not self.car.is_charging() and not self.car.is_driving():
+        safelog('Not sending because not charging or driving')
+        should_send = False
+      # Do send at least once every 60s if we're charging
+      dt = time.time() - self.last_data_time
+      if self.car.is_charging() and dt > 60:
+        safelog('Sending because charging timeout')
+        should_send = True
+      # Do send at least once every 30s if we're driving.
+      elif self.car.is_driving() and dt > 30:
+        safelog('Sending because driving timeout')
+        should_send = True
 
+      # Always send the first data point to initialize the session.    
+      if self.last_data_sent == {}:
+        should_send = True
+      
+      safelog("Sending: "+str(should_send))
+      safelog(self.car.data)
+      if should_send:
+        data = self.car.data
+        for delete in ["charge_voltage",'charge_current','prnd']:
+          if delete in data:
+            del data[delete]
+        params = {'token': self.token, 'api_key': self.apikey, 'tlm': json.dumps(data, separators=(',',':'))}
+        url = 'https://api.iternio.com/1/tlm/send?'+urllib.urlencode(params)
+        try:
+          status = requests.get(url)
+          self.last_data_sent = self.car.data
+          self.last_data_time = time.time()
+          safelog(url)
+          safelog(status)
+          safelog(status.text)
+        except:
+          status = None
+      else:
+        safelog("Not sending data, not recent or not driving/charging.")
+    else:
+      safelog("Not sending data, missing soc, or power")
+      safelog(self.car.data)
+    # Manage sleep as the last thing in the script.
+    self.manage_sleep()
 
-###################################################################################################
-# Following are methods for managing wake/sleep
+  def manage_sleep(self,force=False):
+    if time.time() - self.last_sleep_time < 60 and not force:
+      return
+    else:
+      self.last_sleep_time = time.time()
+    should_be_awake = False
+    if not force:
+      should_be_awake = self.car.should_be_awake()
+    else:
+      should_be_awake = True
+    if should_be_awake:
+      # clear all sleep timers and re-set timers for fail-safe.
+      safelog("Should be awake:" +str(should_be_awake) + ' - Resetting sleep timer')
+      try:
+        __salt__['power.sleep_timer'](*[],**{'clear': '*', 'add': 'ABRP Sleep Timer', 'period': 600, 'reason': 'Vehicle inactive'})
+      except:
+        safelog(traceback.format_exc(), always=True)
+        pass
 
-def manage_sleep(data, force=False):
-  global last_sleep_time
-  if time.time() - last_sleep_time < 60 and not force:
-    return
-  else:
-    last_sleep_time = time.time()
-  should_be_awake = False
-  if not force:
-    if 'is_charging' in data and data['is_charging']:
-      should_be_awake = True
-    elif 'speed' in data and round(data['speed']) != 0:
-      should_be_awake = True
-    elif 'power' in data and abs(data['power']) > 0.3:
-      should_be_awake = True
-  else:
-    # Force to be awake
-    should_be_awake = True
-  if should_be_awake:
-    # clear all sleep timers and re-set timers for fail-safe.
-    safelog("Should be awake:" +str(should_be_awake) + ' - Resetting sleep timer')
-    try:
-      __salt__['power.sleep_timer'](*[],**{'clear': '*', 'add': 'ABRP Sleep Timer', 'period': 600, 'reason': 'Vehicle inactive'})
-    except:
-      pass
 ###############################################################################
 # Define functions to retrieve the PIDs (Modes and Codes) for each vehicle
 
@@ -282,8 +201,6 @@ def get_mdata_to_bytes(i):
   code+="])"
   return code
 
-def get_pids(car_model):
-  pids = {}
   #Notes: 
   # Converting from a Torque PID list may require some trial and error.  AutoPi uses two-part PIDs
   # Per the CAN methodology, service code and PID.
@@ -301,46 +218,13 @@ def get_pids(car_model):
   # And then you can simplify your twos_comp and bytes_to_int by just calling the right version:
   # {s:1:2} = twos_comp(bytes_to_int(message.data[3:4])*256 + bytes_to_int(message.data[4:5]),16)
   # {us:1:2} = bytes_to_int(message.data[3:4])*256 + bytes_to_int(message.data[4:5])
-  tc = TypeCode(car_model)
-  if tc.make in ["chevy","opel"]:
-    pids = {
-      'soc':            "22,8334,({1}*100.0/255.0),7E4",
-      'capacity':       "22,41A3,({us:1:2})/30.0,7E4",
-      'voltage':        "22,2885,({us:1:2})/100.0,7E1",
-      'charge_voltage': "22,436B,({us:1:2})/2.0,7E4",
-      'current':        "22,2414,({s:1:2})/20.0,7E1",
-      'charge_current': "22,436C,({s:1:2})/20.0,7E4",
-      'is_charging':    "22,436C,({s:1:2})/20.0,7E4",
-      'ext_temp':       "22,801E,({1}/2)-40.0,7E4",
-      'batt_temp':      "22,434F,({1}-40.0),7E4",
-      #'odometer':       "A6,166,({us:1:4})/10,???"
-    }
-  elif tc.make in ["hyundai", "kia"]:
-    if int(tc.year) >= 19:
-      pids = {
-        'soc':        "220,105,({32}/2.0),7E4",
-        'soh':        "220,105,({us:26:27})/10.0,7E4",
-        'voltage':    "220,101,({us:13:14})/10.0,7E4",
-        'current':    "220,101,({s:11:12})/10.0,7E4", 
-        'is_charging':"220,101,int(not {51:2}),7E4",
-        'ext_temp':   "220,100,({7}/2.0)-40.0,7B3",
-        'batt_temp':  "220,101,{s:17},7E4",
-        #'odometer':   "22,B002,{us:9:12},7C6" # Need to add 3-byte support.
-      }
-    elif int(tc.year) < 19:
-      # older cars
-      pids = {
-        'soc':        "2,105,({32}/2.0),7E4",
-        'soh':        "2,105,({us:26:27})/10.0,7E4",
-        'voltage':    "2,101,({us:13:14})/10.0,7E4",
-        'current':    "2,101,({s:11:12})/10.0,7E4", 
-        'is_charging':"2,101,int(not {51:2}),7E4",
-        'ext_temp':   "2,100,({7}/2.0)-40.0,7B3",
-        'batt_temp':  "2,101,({s:17}),7E4", # Average the modules?
-        #'odometer':   "22,B002,{us:11:14},7C6"
-      }
-  elif car_model == 'emulator':
-    pids = {
+
+class CarOBD:
+  def __init__(self, typecode):
+    self.tc = TypeCode(typecode)
+    self.typecode = typecode
+    # Default case is the emulator:
+    self.pids = {
       # Emulator uses basic mode 01 PIDs for now, engine tab on the Freematics Emulator
       'soc':            "ABSOLUTE_LOAD", # Absolute Load Value
       'voltage':        "RPM", # Engine RPM
@@ -350,9 +234,175 @@ def get_pids(car_model):
       'is_charging':    "TIMING_ADVANCE", # Timing Advance
       'speed':          "SPEED", # Vehicle Speed
     }
-  return pids
+    self.data = {}
+    
+  def inflate_pids(self):
+    for name in self.pids:
+      (mode,pid,formula,header) = parse_pid_entry(self.pids[name])
+      self.pids[name] = {
+        'mode':     mode,
+        'pid':      pid,
+        'formula':  formula,
+        'header':   header,
+      }
+  
+  def get_obd(self):
+    self.data = {} # Reset data to prevent old values from being carried forever.
+    for name in self.pids:
+      check_restart()
+      pid = self.pids[name]
+      if 'pid' not in pid:
+        self.inflate_pids()
+        pid = self.pids[name]
+      try:
+        args = [name]
+        if pid['mode'] is None and pid['pid'] is not None:
+          # using emulator, simpler call:
+          args = [pid['pid']]
+          kwargs = {}
+        else:
+          kwargs = {
+            'mode': pid['mode'],
+            'pid': pid['pid'],
+            'header': pid['header'],
+            'formula': pid['formula'],
+            'verify': False,
+            'force': True,
+          }
+        self.data[name] = __salt__['obd.query'](*args, **kwargs)['value']
+      except:
+        safelog(traceback.format_exc(), always=True)
+        # Data doesn't exist for this PID, skip it.
+        pass
+  
+  def get_location(self):
+    check_restart()
+    self.location = None
+    try:
+      self.location = __salt__['ec2x.gnss_location'](*[], **{})
+    except:
+      # Didn't get location data, skip it.
+      pass
 
-###################################################################################################
+  def should_be_awake(self):
+    should_be_awake = False
+    if 'is_charging' in self.data and self.data['is_charging']:
+      should_be_awake = True
+    elif 'speed' in self.data and round(self.data['speed']) != 0:
+      should_be_awake = True
+    elif 'power' in self.data and abs(self.data['power']) > 0.3:
+      should_be_awake = True
+    elif self.is_driving() is not None:
+      should_be_awake = self.is_driving() # Charging cases should be caught above
+    return should_be_awake
+
+  def is_driving(self):
+    # Simple version if we don't have anything better. Override these per-vehicle if we have something better.
+    return not self.is_charging()
+
+  def is_charging(self):
+    return 'is_charging' in self.data and self.data['is_charging']
+
+  def clean_up_data(self):
+    data = self.data
+    location = self.location
+    if "speed" not in data and location is not None:
+      data['speed'] = location['sog_km']
+    if "is_charging" in data and data["is_charging"] != 0:
+      # Standardize the "is_charging" parameters, not all cars have simple bool
+      data["is_charging"] = 1
+    else:
+      data["is_charging"] = 0
+    for s in ["soh", "soc"]:
+      # Constrain SOH and SOC to realistic values.  May need to rethink this later.
+      if s in data and data[s] > 100:
+        data[s] = 100
+      elif s in data and data[s] < 0:
+        data[s] = 0
+    if "power" not in data and "current" in data and "voltage" in data:
+      data["power"] = float(data["current"]) * float(data["voltage"]) / 1000.0 #kW
+    if data["is_charging"] and "charge_voltage" in data and "charge_current" in data and round(data["charge_current"]) != 0:
+      if data["charge_current"] > 0:
+        data["charge_current"] *= -1
+      data["power"] = float(data["charge_current"]) * float(data["charge_voltage"]) / 1000.0
+      data["voltage"] = float(data["charge_voltage"])
+      data["current"] = float(data["charge_current"])
+      safelog("Using charge power instead of raw value")
+    if "is_charging" in data and data["is_charging"] and "power" in data and int(data['power']) == 0:
+      data["is_charging"] = 0 # Ignore non-charge events.
+    # Truncate data to reduce bandwidth usage
+    for d in ['soc','soh','capacity','voltage','current','power','ext_temp','batt_temp']:
+      if d in data:
+        data[d] = round(data[d]*10)/10
+    # utc - Current UTC timestamp in seconds
+    data['utc'] = round(time.time())
+    if location is not None:
+      data['lat'] = location['lat']
+      data['lon'] = location['lon']
+      data['heading'] = location['cog']
+    elif self.typecode == "emulator":
+      data['lat'] = 28.608321
+      data['lon'] = -80.604153
+
+    self.data = data
+
+class Chevy(CarOBD):
+  def __init__(self,typecode):
+    CarOBD.__init__(self, typecode)
+    self.pids = {
+      'soc':            "22,8334,({1}*100.0/255.0),7E4",
+      'voltage':        "22,2885,({us:1:2})/100.0,7E1",
+      'charge_voltage': "22,436B,({us:1:2})/2.0,7E4",
+      'current':        "22,2414,({s:1:2})/20.0,7E1",
+      'charge_current': "22,436C,({s:1:2})/20.0,7E4",
+      'is_charging':    "22,436C,({s:1:2})/20.0,7E4",
+      'ext_temp':       "22,801E,({1}/2)-40.0,7E4",
+      'batt_temp':      "22,434F,({1}-40.0),7E4",
+      'prnd':           "22,2889,({1}),7E1", # 8=P, 3=D, 7=R, 6=N, 1=L
+    }
+    if int(self.tc.year) < 19:
+      self.pids['capacity'] = "22,41A3,({us:1:2})/30.0,7E4" #Reports strange results in post-2019 Bolts.
+    self.inflate_pids()
+
+  ###################################################################################################
+  # Override functions go here:
+  def is_driving(self):
+    if 'prnd' in self.data and self.data['prnd'] != 8:
+      return True
+    elif 'prnd' in self.data and self.data['prnd'] == 8:
+      return False
+    else:
+      return False # No response means we're not driving.
+  
+class HKMC(CarOBD):
+  def __init__(self,typecode):
+    CarOBD.__init__(self, typecode)
+    if int(self.tc.year) >= 19:
+      self.pids = {
+        'soc':        "220,105,({32}/2.0),7E4",
+        'soh':        "220,105,({us:26:27})/10.0,7E4",
+        'voltage':    "220,101,({us:13:14})/10.0,7E4",
+        'current':    "220,101,({s:11:12})/10.0,7E4", 
+        'is_charging':"220,101,int(not {51:2}),7E4",
+        'ext_temp':   "220,100,({7}/2.0)-40.0,7B3",
+        'batt_temp':  "220,101,{s:17},7E4",
+        #'odometer':   "22,B002,{us:9:12},7C6" # Need to add 3-byte support.
+      }
+    elif int(self.tc.year) < 19:
+      # older cars
+      self.inflate_pidspids = {
+        'soc':        "2,105,({32}/2.0),7E4",
+        'soh':        "2,105,({us:26:27})/10.0,7E4",
+        'voltage':    "2,101,({us:13:14})/10.0,7E4",
+        'current':    "2,101,({s:11:12})/10.0,7E4", 
+        'is_charging':"2,101,int(not {51:2}),7E4",
+        'ext_temp':   "2,100,({7}/2.0)-40.0,7B3",
+        'batt_temp':  "2,101,({s:17}),7E4", # Average the modules?
+        #'odometer':   "22,B002,{us:11:14},7C6"
+      }
+    self.inflate_pids()
+
+
 # Following are testing functions to make sure things are working right. Ish.
 msg_data = re.compile(r'message.data')
 def bytes_to_int(bytes):
@@ -372,11 +422,10 @@ def check_formula(formula):
   eval(formula)
 
 def safelog(text,always=False):
-  global global_debug
-  global command_line
   if global_debug or always:
     try:
-      text = "ABRP Script: "+str(text)
+      text = 'ABRP: ' + text
+      text = re.sub(r'\n',"\nABRP: ",text)
       log.info(text)
       if command_line:
         print(text)
@@ -401,17 +450,18 @@ class TypeCode:
 if __name__ == "__main__":
   global_debug = True
   command_line = True
-  print "Running from command line."
-  last_data = {}
-  last_data_time = time.time()
-  pids = get_pids("hyundai:ioniq:14:33:other")
-  # pids = get_pids("kona:19")
-  for name in pids:
-    (mode,pid,formula,header) = parse_pid_entry(pids[name])
-    print(name + "=" + mode + "," + pid + "=" + formula)
-    if formula is not None:
-      check_formula(formula)
+  import pprint
+  pp = pprint.PrettyPrinter(indent=2)
 
-  tlm(test=True,testdata={"soc": 88.4, "soh":100, "voltage":388.0, "current": 40,
-    "is_charging": 0, "ext_temp":20, "batt_temp": 20, "lat":29.5641, "lon":-95.0255, "speed":113.2
-  },token="test",car_model='chevy:bolt:17:60:other')
+  print "Running from command line."
+  # last_data = {}
+  # last_data_time = time.time()
+  typecodes = ['hyundai:ioniq:14:28:other','chevy:bolt:17:60:other','hyundai:kona:19:64:other','emulator']
+  for typecode in typecodes:
+    poller = Poller(typecode,'test')
+    pp.pprint(poller.car.pids)
+    poller.get_tlm()
+
+  # tlm(test=True,testdata={"soc": 88.4, "soh":100, "voltage":388.0, "current": 40,
+  #   "is_charging": 0, "ext_temp":20, "batt_temp": 20, "lat":29.5641, "lon":-95.0255, "speed":113.2
+  # },token="test",car_model='chevy:bolt:17:60:other')

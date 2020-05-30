@@ -92,10 +92,7 @@ class Poller():
       safelog("Sending: "+str(should_send))
       safelog(self.car.data)
       if should_send:
-        data = self.car.data
-        for delete in ["charge_voltage",'charge_current','prnd']:
-          if delete in data:
-            del data[delete]
+        data = self.car.get_pruned_data()
         params = {'token': self.token, 'api_key': self.apikey, 'tlm': json.dumps(data, separators=(',',':'))}
         url = 'https://api.iternio.com/1/tlm/send?'+urllib.urlencode(params)
         try:
@@ -301,7 +298,10 @@ class CarOBD:
     return not self.is_charging()
 
   def is_charging(self):
-    return 'is_charging' in self.data and self.data['is_charging']
+    is_charging = 'is_charging' in self.data and self.data['is_charging']
+    if is_charging and 'might_be_dcfc' in self.data and self.data['might_be_dcfc']:
+      self.data['is_dcfc'] = 1
+    return is_charging
 
   def clean_up_data(self):
     data = self.data
@@ -344,7 +344,15 @@ class CarOBD:
       data['lat'] = 28.608321
       data['lon'] = -80.604153
 
-    self.data = data
+  def get_pruned_data(self):
+    data = self.data.copy()
+    allowed_params = ["utc", "soc", "soh", "speed", "lat", "lon", "elevation", "heading", "is_charging", "power", 
+    "ext_temp", "current", "voltage", "batt_temp", "car_model", "session_id", "timestamp", "location", 
+    "heading", "odometer", "kwh_charged", "is_dcfc", "capacity"]
+    for d in self.data:
+      if d not in allowed_params:
+        del data[d]
+    return data
 
 class Chevy(CarOBD):
   def __init__(self,typecode):
@@ -359,6 +367,7 @@ class Chevy(CarOBD):
       'ext_temp':       "22,801E,({1}/2)-40.0,7E4",
       'batt_temp':      "22,434F,({1}-40.0),7E4",
       'prnd':           "22,2889,({1}),7E1", # 8=P, 3=D, 7=R, 6=N, 1=L
+      'might_be_dcfc':  "22,4369,(not {1}),7E4", #AC current.  If AC Current is 0, then it could be a DCFC
     }
     if int(self.tc.year) < 19:
       self.pids['capacity'] = "22,41A3,({us:1:2})/30.0,7E4" #Reports strange results in post-2019 Bolts.

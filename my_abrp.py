@@ -84,6 +84,10 @@ class Poller():
       elif self.car.is_driving() and dt > 30:
         safelog('Sending because driving timeout')
         should_send = True
+      # Send if the last status was charging, but this one is not.
+      elif 'is_charging' in self.last_data_sent and self.last_data_sent['is_charging'] and not self.car.is_charging():
+        safelog('Sending because just stopped charging.')
+        should_send = True
 
       # Always send the first data point to initialize the session.    
       if self.last_data_sent == {}:

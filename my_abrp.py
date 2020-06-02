@@ -428,10 +428,12 @@ class HKMC(CarOBD):
         'voltage':    "220,101,({us:13:14})/10.0,7E4",
         'current':    "220,101,({s:11:12})/10.0,7E4", 
         'is_charging':"220,101,int(not {51:2}),7E4",
+        # 'is_charging':"220,101,({10:5} or {10:6}),7E4",
         'ext_temp':   "220,100,({7}/2.0)-40.0,7B3",
         'batt_temp':  "220,101,{s:17},7E4",
         #'odometer':   "22,B002,{us:9:12},7C6" # Need to add 3-byte support.
-        'is_ignit':   "220,101,{10:0},7E4",
+        # 'is_bms':     "220,101,{10:0},7E4",
+        # 'is_ignit':   "220,101,{51:2},7E4"
       }
     # elif int(self.tc.year) < 19:
     #   # older cars
@@ -447,16 +449,16 @@ class HKMC(CarOBD):
     #   }
     self.inflate_pids()
 
-  def is_driving(self):
-    if 'is_charging' in self.data and self.data['is_charging']:
-      return False
-    if 'is_ignit' in self.data:
-      if self.data['is_ignit']:
-        return True
-      else:
-        return False
-    else:
-      return False
+  # def is_driving(self):
+  #   if 'is_charging' in self.data and self.data['is_charging']:
+  #     return False
+  #   if 'is_ignit' in self.data:
+  #     if self.data['is_ignit']:
+  #       return True
+  #     else:
+  #       return False
+  #   else:
+  #     return False
 
 # Following are testing functions to make sure things are working right. Ish.
 msg_data = re.compile(r'message.data')

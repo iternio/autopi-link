@@ -6,13 +6,15 @@ import re
 import traceback
 from datetime import datetime
 import os
-
+import sys
+sys.path.append('/opt/autopi/salt/modules/')
 # Structure and lots of initial work from @plord12 on GitHub:
 # https://github.com/plord12/autopi-tools
 
 log = logging.getLogger(__name__)
 global_debug = False
 first_run_time = datetime.now()
+
 def check_restart():
   modtime = datetime.fromtimestamp(os.stat(os.path.abspath(__file__)).st_mtime)
   if modtime > first_run_time:
@@ -20,13 +22,13 @@ def check_restart():
     os._exit(1)
 
 
-def tlm(test=False,testdata=None, token=None, car_model=None, debug=False):
+def tlm(test=False,testdata=None, token=None, car_model=None, debug=False, scripts=None):
   global global_debug
   global_debug = debug
   safelog("========> Initializing ABRP Script <========",always=True)
   safelog("car_model="+car_model,always=True)
   last_run = 0
-  poller = Poller(car_model,token)
+  poller = Poller(car_model,token,scripts)
   while(True):
     now = time.time()
     next_run = last_run + 5
@@ -42,13 +44,33 @@ def tlm(test=False,testdata=None, token=None, car_model=None, debug=False):
 
 
 class Poller():
-  def __init__(self, typecode, token):
+  def __init__(self, typecode, token, scripts):
     self.apikey = '6f6a554f-d8c8-4c72-8914-d5895f58b1eb'
     self.token = token
     self.last_data_sent = {}
     self.last_data_time = time.time() - 600 # 10 minutes ago to ensure we check send on first run.
     self.last_sleep_time = time.time() - 600 # 10 minutes ago, to ensure we check sleep on first run.
     
+    if scripts is not None:
+      scripts = scripts.split(',')
+      for i,script in enumerate(scripts):
+        try:
+          module = __import__(script)
+          scripts[i] = module.ABRPAddOn() # ABRP Addon scripts are expected to have this class.
+        except ImportError:
+          safelog("No such script exists: "+script, always=True)
+          os._exit(1)
+        except SyntaxError:
+          safelog("Syntax Error in "+script)
+          safelog(traceback.format_exc(), always=True)
+          os._exit(1)
+        except:
+          safelog("Some other exception occurred in "+script)
+          safelog(traceback.format_exc(), always=True)
+          os._exit(1)
+    else:
+      safelog("No scripts given in kwargs")
+    self.scripts = scripts
     self.tc = TypeCode(typecode)
     if self.tc.make in ['chevy','opel']:
       self.car = Chevy(typecode)
@@ -115,6 +137,14 @@ class Poller():
       safelog(self.car.data)
     # Manage sleep as the last thing in the script.
     self.manage_sleep()
+    if self.scripts is not None:
+      for script in self.scripts:
+        try:
+          script.on_cycle(self.car.data)
+        except:
+          safelog(traceback.format_exc(), always=True)
+          pass
+
 
   def manage_sleep(self,force=False):
     if time.time() - self.last_sleep_time < 60 and not force:
@@ -272,7 +302,6 @@ class CarOBD:
           }
         self.data[name] = __salt__['obd.query'](*args, **kwargs)['value']
       except:
-        safelog(traceback.format_exc(), always=True)
         # Data doesn't exist for this PID, skip it.
         pass
   

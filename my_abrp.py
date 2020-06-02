@@ -409,6 +409,8 @@ class Chevy(CarOBD):
   ###################################################################################################
   # Override functions go here:
   def is_driving(self):
+    if 'is_charging' in self.data and self.data['is_charging']:
+      return False
     if 'prnd' in self.data and self.data['prnd'] != 8:
       return True
     elif 'prnd' in self.data and self.data['prnd'] == 8:
@@ -429,21 +431,32 @@ class HKMC(CarOBD):
         'ext_temp':   "220,100,({7}/2.0)-40.0,7B3",
         'batt_temp':  "220,101,{s:17},7E4",
         #'odometer':   "22,B002,{us:9:12},7C6" # Need to add 3-byte support.
+        'is_ignit':   "220,101,{10:0},7E4",
       }
-    elif int(self.tc.year) < 19:
-      # older cars
-      self.inflate_pidspids = {
-        'soc':        "2,105,({32}/2.0),7E4",
-        'soh':        "2,105,({us:26:27})/10.0,7E4",
-        'voltage':    "2,101,({us:13:14})/10.0,7E4",
-        'current':    "2,101,({s:11:12})/10.0,7E4", 
-        'is_charging':"2,101,int(not {51:2}),7E4",
-        'ext_temp':   "2,100,({7}/2.0)-40.0,7B3",
-        'batt_temp':  "2,101,({s:17}),7E4", # Average the modules?
-        #'odometer':   "22,B002,{us:11:14},7C6"
-      }
+    # elif int(self.tc.year) < 19:
+    #   # older cars
+    #   self.inflate_pidspids = {
+    #     'soc':        "2,105,({32}/2.0),7E4",
+    #     'soh':        "2,105,({us:26:27})/10.0,7E4",
+    #     'voltage':    "2,101,({us:13:14})/10.0,7E4",
+    #     'current':    "2,101,({s:11:12})/10.0,7E4", 
+    #     'is_charging':"2,101,int(not {51:2}),7E4",
+    #     'ext_temp':   "2,100,({7}/2.0)-40.0,7B3",
+    #     'batt_temp':  "2,101,({s:17}),7E4", # Average the modules?
+    #     #'odometer':   "22,B002,{us:11:14},7C6"
+    #   }
     self.inflate_pids()
 
+  def is_driving(self):
+    if 'is_charging' in self.data and self.data['is_charging']:
+      return False
+    if 'is_ignit' in self.data:
+      if self.data['is_ignit']:
+        return True
+      else:
+        return False
+    else:
+      return False
 
 # Following are testing functions to make sure things are working right. Ish.
 msg_data = re.compile(r'message.data')
@@ -500,7 +513,7 @@ if __name__ == "__main__":
   # last_data_time = time.time()
   typecodes = ['hyundai:ioniq:14:28:other','chevy:bolt:17:60:other','hyundai:kona:19:64:other','emulator']
   for typecode in typecodes:
-    poller = Poller(typecode,'test')
+    poller = Poller(typecode,'test',None)
     pp.pprint(poller.car.pids)
     poller.get_tlm()
 

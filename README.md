@@ -10,24 +10,34 @@ If you'd like to add another car, the code is open source, feel free to modify t
 
 The ABRP script now supports Add-Ons.  We've found that the obd.query calls via `__salt__` take quite a long time to execute, so making multiple redundant calls really slows the whole system down.
 
-To add one of your scripts to be run, simple add copy our example code from my_script.py, and add it to the AutoPi Custom Code as an Execute script.  Make your modifications, and then add a `scripts` kwarg to the ABRP Job:
-`scripts=my_script`
-If you have more than one script, they must be comma-separated:
-`scripts=my_script,my_other_script,my_third_script`
-Some helpful use tips:
+To add one of your scripts to be run, start by making of copy of `my_script.py`.  Rename it and write your code.  Once you're ready to test:  
+1. Add it to AutoPi Custom Code
+2. Set Type to **Execution**
+3. Add a Kwarg to the ABRP Job `scripts=my_script` after all the other kwargs
+4. Sync the script and job to your AutoPi and reboot it.
 
+If you have more than one script to run, just add them all comma-separated to the scripts kwarg: `scripts=my_script,my_other_script,my_third_script`
+
+The ABRP Script has to be restarted to see new scripts, this can be done by rebooting the AutoPi, or simply making a small change (adding a comment) and syncing the script to the device.
+
+To work on development with your script I recommend:  
+1. SSHing into the Autopi ([how-to from AutoPi](https://community.autopi.io/t/guide-how-to-ssh-to-your-dongle/386))
+2. Tailing the Logfile using a grep command  
+`sudo tail -f /var/log/salt/minion | grep my_script`   
+  which will filter to only show the logs from your script (insert the name of your script instead of my_script)
+
+Then you can make changes and see the results in real time (after the script restarts)
+
+Finally, some notes on the functions in the template (You'll want to keep all of these functions, though you're welcome to add your own to refine the behavior):
  - The `__init__` function will be called on when the ABRP script starts up.
  - The `on_cycle` function will be called about once every 5 seconds (depending on how long it takes to retrieve OBD data).
+ - The `check_restart` function can be called whenever you like (I have it called during `on_cycle`) to see if the script has updated and quit if it has.
 
-Just like the main script, as long as you leave the `check_restart` call in place, it'll stop and let the job restart the script whenever you make an update to make troubleshooting / development easier.
+Feel free to post any questions you have on the ABRP Forums, or email me directly (jason@abetterrouteplanner.com) 
 
 ## License and Thanks
 This code is published under the open Apache license, however the app sourcecode itself is not open.
 
-  
-
 Thank you so much for helping out!
-
-  
 
 Jason and the Iternio Team

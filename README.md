@@ -24,7 +24,7 @@ To work on development with your script I recommend:
 1. SSHing into the Autopi ([how-to from AutoPi](https://community.autopi.io/t/guide-how-to-ssh-to-your-dongle/386))
 2. Tailing the Logfile using a grep command  
 `sudo tail -f /var/log/salt/minion | grep my_script`   
-  which will filter to only show the logs from your script (insert the name of your script instead of my_script)
+  which will filter to only show the logs from your script (insert the name of your script instead of my_script, or ABRP to see the ABRP script logs / errors.  The ABRP script will log errors that crash your script.)
 
 Then you can make changes and see the results in real time (after the script restarts)
 

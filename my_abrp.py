@@ -97,6 +97,9 @@ class Poller():
       if not self.car.is_charging() and not self.car.is_driving():
         safelog('Not sending because not charging or driving')
         should_send = False
+        # Unless the last thing we sent is substantially different:
+        if 'soc' in self.last_data_sent and 'soc' in self.car.data and self.last_data_sent['soc'] != self.car.data['soc']:
+          should_send = True
       # Do send at least once every 60s if we're charging
       dt = time.time() - self.last_data_time
       if self.car.is_charging() and dt > 60:
@@ -110,7 +113,7 @@ class Poller():
       elif 'is_charging' in self.last_data_sent and self.last_data_sent['is_charging'] and not self.car.is_charging():
         safelog('Sending because just stopped charging.')
         should_send = True
-
+      
       # Always send the first data point to initialize the session.    
       if self.last_data_sent == {}:
         should_send = True

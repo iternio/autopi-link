@@ -331,7 +331,7 @@ class CarOBD:
 
   def is_driving(self):
     # Simple version if we don't have anything better. Override these per-vehicle if we have something better.
-    return not self.is_charging()
+    return None
 
   def is_charging(self):
     is_charging = 'is_charging' in self.data and self.data['is_charging']

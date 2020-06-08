@@ -330,13 +330,20 @@ class CarOBD:
 
   def is_driving(self):
     # Simple version if we don't have anything better. Override these per-vehicle if we have something better.
-    return None
+    if self.in_and_true('is_driving'):
+      return True
+    elif 'is_driving' in self.data:
+      return False
+    else:
+      return None
 
   def is_charging(self):
-    is_charging = 'is_charging' in self.data and self.data['is_charging']
-    if is_charging and 'might_be_dcfc' in self.data and self.data['might_be_dcfc']:
-      self.data['is_dcfc'] = 1
-    return is_charging
+    if self.in_and_true('is_charging'):
+      return True
+    elif 'is_charging' in self.data:
+      return False
+    else:
+      return None
 
   def clean_up_data(self):
     data = self.data
@@ -344,10 +351,10 @@ class CarOBD:
     if "speed" not in data and location is not None:
       data['speed'] = location['sog_km']
     if "is_charging" in data and data["is_charging"] != 0:
-      # Standardize the "is_charging" parameters, not all cars have simple bool
+      # Standardize the "is_charging" parameters, not all cars have simple 0/1
       data["is_charging"] = 1
     else:
-      data["is_charging"] = 0
+      data["is_charging"] = int(self.is_charging())
     for s in ["soh", "soc"]:
       # Constrain SOH and SOC to realistic values.  May need to rethink this later.
       if s in data and data[s] > 100:
@@ -389,6 +396,9 @@ class CarOBD:
         del data[d]
     return data
 
+  def in_and_true(self,param):
+    return param in self.data and self.data[param]
+
 class Chevy(CarOBD):
   def __init__(self,typecode):
     CarOBD.__init__(self, typecode)
@@ -420,6 +430,11 @@ class Chevy(CarOBD):
     else:
       return False # No response means we're not driving.
   
+  def is_charging(self):
+    if self.in_and_true('is_charging') and self.in_and_true('might_be_dcfc'):
+      self.data['is_dcfc'] = 1
+    return self.in_and_true('is_charging')
+
 class HKMC(CarOBD):
   def __init__(self,typecode):
     CarOBD.__init__(self, typecode)
@@ -429,13 +444,13 @@ class HKMC(CarOBD):
         'soh':        "220,105,({us:26:27})/10.0,7E4",
         'voltage':    "220,101,({us:13:14})/10.0,7E4",
         'current':    "220,101,({s:11:12})/10.0,7E4", 
-        'is_charging':"220,101,int(not {51:2}),7E4",
-        # 'is_charging':"220,101,({10:5} or {10:6}),7E4",
+        # 'is_charging':"220,101,int(not {51:2}),7E4",
         'ext_temp':   "220,100,({7}/2.0)-40.0,7B3",
         'batt_temp':  "220,101,{s:17},7E4",
         #'odometer':   "22,B002,{us:9:12},7C6" # Need to add 3-byte support.
-        # 'is_bms':     "220,101,{10:0},7E4",
-        # 'is_ignit':   "220,101,{51:2},7E4"
+        'is_bms':     "220,101,{10:0},7E4",
+        'is_ignit':   "220,101,{51:2},7E4",
+        'rpm':  "220,101,{s:54:55},7E4"
       }
     # elif int(self.tc.year) < 19:
     #   # older cars
@@ -451,16 +466,22 @@ class HKMC(CarOBD):
     #   }
     self.inflate_pids()
 
-  # def is_driving(self):
-  #   if 'is_charging' in self.data and self.data['is_charging']:
-  #     return False
-  #   if 'is_ignit' in self.data:
-  #     if self.data['is_ignit']:
-  #       return True
-  #     else:
-  #       return False
-  #   else:
-  #     return False
+  def is_charging(self):
+    if {'is_bms','power','rpm'}.issubset(self.data.keys()) and \
+      self.data['is_bms'] and self.data['power'] < -1 and abs(self.data['rpm']) < 1:
+      return True
+    else:
+      return False
+
+  def is_driving(self):
+    # Don't have a shifter PID, so check charging, ignition and BMS relay
+    if self.is_charging():
+      return False
+    elif 'is_ignit' in self.data and self.data['is_ignit']:
+      return True
+    else:
+      return False
+
 
 # Following are testing functions to make sure things are working right. Ish.
 msg_data = re.compile(r'message.data')

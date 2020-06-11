@@ -469,14 +469,16 @@ class HKMC(CarOBD):
     self.inflate_pids()
 
   def is_charging(self):
-    if {'is_bms','power','rpm'}.issubset(self.data.keys()) and \
-      self.data['is_bms'] and self.data['power'] < -1 and abs(self.data['rpm']) < 1:
+    if 'power' not in self.data and {'voltage', 'current'}.issubset(self.data.keys()):
+      self.data['power'] = self.data['voltage'] * self.data['current']
+    if {'is_bms','power','rpm'}.issubset(self.data.keys()) \
+      and self.data['is_bms'] and self.data['power'] < -1 and abs(self.data['rpm']) < 1:
       return True
     else:
       return False
 
   def is_driving(self):
-    # Don't have a shifter PID, so check charging, ignition and BMS relay
+    # Don't have a shifter PID, so check not charging and ignition
     if self.is_charging():
       return False
     elif 'is_ignit' in self.data and self.data['is_ignit']:

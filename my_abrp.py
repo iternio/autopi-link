@@ -125,8 +125,9 @@ class Poller():
         url = 'https://api.iternio.com/1/tlm/send?'+urllib.urlencode(params)
         try:
           status = requests.get(url)
-          self.last_data_sent = self.car.data
-          self.last_data_time = time.time()
+          if status.status_code == 200:
+            self.last_data_sent = self.car.data
+            self.last_data_time = time.time()
           safelog(url)
           safelog(status)
           safelog(status.text)

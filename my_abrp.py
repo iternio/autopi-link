@@ -469,7 +469,7 @@ class HKMC(CarOBD):
 
   def is_charging(self):
     if 'power' not in self.data and {'voltage', 'current'}.issubset(self.data.keys()):
-      self.data['power'] = self.data['voltage'] * self.data['current']
+      self.data['power'] = self.data['voltage'] * self.data['current'] / 1000
     if {'is_bms','power','rpm'}.issubset(self.data.keys()) \
       and self.data['is_bms'] and self.data['power'] < -1 and abs(self.data['rpm']) < 1:
       return True

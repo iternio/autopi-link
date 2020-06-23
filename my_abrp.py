@@ -438,10 +438,9 @@ class HKMC(CarOBD):
         'is_charging':"220,101,int(not {51:2} and {10:0}),7E4",
         'ext_temp':   "220,100,({7}/2.0)-40.0,7B3",
         'batt_temp':  "220,101,{s:17},7E4",
-        #'odometer':   "22,B002,{us:9:12},7C6" # Need to add 3-byte support.
-        'is_bms':     "220,101,{10:0},7E4",
-        'is_ignit':   "220,101,{51:2},7E4",
-        'rpm':  "220,101,{s:54:55},7E4"
+        'odometer':   "22,B002,bytes_to_int(message.data[10:12]),7C6",
+        'speed':      "220,100,bytes_to_int(message.data[32:33]),7B3",
+        'kwh_charged':"220,101,(bytes_to_int(message.data[41:45]))/10.0,7E4",
       }
     # elif int(self.tc.year) < 19:
     #   # older cars

@@ -447,13 +447,12 @@ class HKMC(CarOBD):
         'soh':        "220,105,({us:26:27})/10.0,7E4",
         'voltage':    "220,101,({us:13:14})/10.0,7E4",
         'current':    "220,101,({s:11:12})/10.0,7E4", 
-        # 'is_charging':"220,101,int(not {51:2}),7E4",
+        'is_charging':"220,101,int(not {51:2} and {10:0}),7E4",
         'ext_temp':   "220,100,({7}/2.0)-40.0,7B3",
         'batt_temp':  "220,101,{s:17},7E4",
-        #'odometer':   "22,B002,{us:9:12},7C6" # Need to add 3-byte support.
-        'is_bms':     "220,101,{10:0},7E4",
-        'is_ignit':   "220,101,{51:2},7E4",
-        'rpm':  "220,101,{s:54:55},7E4"
+        'odometer':   "22,B002,bytes_to_int(message.data[10:12]),7C6",
+        'speed':      "220,100,bytes_to_int(message.data[32:33]),7B3",
+        'kwh_charged':"220,101,(bytes_to_int(message.data[41:45]))/10.0,7E4",
       }
     # elif int(self.tc.year) < 19:
     #   # older cars
@@ -468,24 +467,6 @@ class HKMC(CarOBD):
     #     #'odometer':   "22,B002,{us:11:14},7C6"
     #   }
     self.inflate_pids()
-
-  def is_charging(self):
-    if 'power' not in self.data and {'voltage', 'current'}.issubset(self.data.keys()):
-      self.data['power'] = self.data['voltage'] * self.data['current']
-    if {'is_bms','power','rpm'}.issubset(self.data.keys()) \
-      and self.data['is_bms'] and self.data['power'] < -1 and abs(self.data['rpm']) < 1:
-      return True
-    else:
-      return False
-
-  def is_driving(self):
-    # Don't have a shifter PID, so check not charging and ignition
-    if self.is_charging():
-      return False
-    elif 'is_ignit' in self.data and self.data['is_ignit']:
-      return True
-    else:
-      return False
 
 
 # Following are testing functions to make sure things are working right. Ish.

@@ -86,7 +86,7 @@ class Poller():
     if not self.token:
       safelog("Token or Car Model missing from job kwargs")
       return None
-    if "soc" in self.car.data:
+    if "soc" in self.car.data and 'power' in self.car.data:
       min_changed = ["soc","power","is_charging"]
       should_send = False
       for param in min_changed:
@@ -361,7 +361,7 @@ class CarOBD:
       data["voltage"] = float(data["charge_voltage"])
       data["current"] = float(data["charge_current"])
       safelog("Using charge power instead of raw value")
-    if "is_charging" in data and data["is_charging"] and "power" in data and int(data['power']) == 0:
+    if "is_charging" in data and data["is_charging"] and "power" in data and abs(data['power']) < 0.3:
       data["is_charging"] = 0 # Ignore non-charge events.
     # Truncate data to reduce bandwidth usage
     for d in ['soc','soh','capacity','voltage','current','power','ext_temp','batt_temp']:

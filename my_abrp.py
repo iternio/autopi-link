@@ -21,27 +21,30 @@ def check_restart():
     safelog("Script has been updated, restarting to incorporate updates.",always=True)
     os._exit(1)
 
-
-def tlm(test=False,testdata=None, token=None, car_model=None, debug=False, scripts=None):
-  global global_debug
-  global_debug = debug
-  safelog("========> Initializing ABRP Script <========",always=True)
-  safelog("car_model="+car_model,always=True)
-  last_run = 0
-  poller = Poller(car_model,token,scripts)
-  while(True):
-    now = time.time()
-    next_run = last_run + 5
-    if now < next_run:
-      time.sleep(next_run - now)
-    last_run = time.time()
-    check_restart()
-    try:
-      poller.get_tlm()
-    except Exception:
-      safelog(traceback.format_exc(), always=True)
-      os._exit(1)
-
+def start(token=None, car_model=None, debug=False, scripts=None, **settings):
+  try:
+    global global_debug
+    global_debug = True
+    safelog("========> Initializing ABRP Script <========",always=True)
+    safelog("car_model="+car_model,always=True)
+    last_run = 0
+    poller = Poller(car_model,token,scripts)
+    while(True):
+      now = time.time()
+      next_run = last_run + 5
+      if now < next_run:
+        time.sleep(next_run - now)
+      last_run = time.time()
+      check_restart()
+      try:
+        poller.get_tlm()
+      except Exception:
+        safelog(traceback.format_exc(), always=True)
+        os._exit(1)
+  except Exception:
+    safelog(traceback.format_exc(), always=True)
+  finally:
+    safelog("Exiting ABRP script")
 
 class Poller():
   def __init__(self, typecode, token, scripts):

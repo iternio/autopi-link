@@ -443,18 +443,18 @@ class HKMC(CarOBD):
         'speed':      "220,100,bytes_to_int(message.data[32:33]),7B3",
         'kwh_charged':"220,101,(bytes_to_int(message.data[41:45]))/10.0,7E4",
       }
-    # elif int(self.tc.year) < 19:
-    #   # older cars
-    #   self.inflate_pidspids = {
-    #     'soc':        "2,105,({32}/2.0),7E4",
-    #     'soh':        "2,105,({us:26:27})/10.0,7E4",
-    #     'voltage':    "2,101,({us:13:14})/10.0,7E4",
-    #     'current':    "2,101,({s:11:12})/10.0,7E4", 
-    #     'is_charging':"2,101,int(not {51:2}),7E4",
-    #     'ext_temp':   "2,100,({7}/2.0)-40.0,7B3",
-    #     'batt_temp':  "2,101,({s:17}),7E4", # Average the modules?
-    #     #'odometer':   "22,B002,{us:11:14},7C6"
-    #   }
+    elif int(self.tc.year) < 19:
+      # older cars
+      self.inflate_pidspids = {
+        'soc':        "2,105,({32}/2.0),7E4",
+        'soh':        "2,105,({us:26:27})/10.0,7E4",
+        'voltage':    "2,101,({us:13:14})/10.0,7E4",
+        'current':    "2,101,({s:11:12})/10.0,7E4", 
+        'is_charging':"2,101,int(not {51:2}),7E4",
+        'ext_temp':   "2,100,({7}/2.0)-40.0,7B3",
+        'batt_temp':  "2,101,({s:17}),7E4", # Average the modules?
+        #'odometer':   "22,B002,{us:11:14},7C6"
+      }
     self.inflate_pids()
 
 
@@ -516,7 +516,7 @@ if __name__ == "__main__":
     poller = Poller(typecode,'test',None)
     pp.pprint(poller.car.pids)
     poller.get_tlm()
-
+  
   # tlm(test=True,testdata={"soc": 88.4, "soh":100, "voltage":388.0, "current": 40,
   #   "is_charging": 0, "ext_temp":20, "batt_temp": 20, "lat":29.5641, "lon":-95.0255, "speed":113.2
   # },token="test",car_model='chevy:bolt:17:60:other')

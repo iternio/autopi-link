@@ -6,6 +6,25 @@ Thanks for checking out our API code for AutoPi! You can find the installation i
 
 If you'd like to add another car, the code is open source, feel free to modify the code and submit a pull request. If you have questions on how to do this contact us at contact@abetterrouteplanner.com
 
+## Installing Service
+
+Installing the script from this branch is a little different from the standard install, it'll run a little quicker on start, but only about 10 seconds quicker, so it might not be worth the extra trouble.  To install:  
+1. Create a new script, and change its type to "Service"  
+2. Go to the service created under Advanced > Services > Settings and enable it
+3. Add a dictionary formatted like a JSON to "Override Settings":
+```
+{
+    "debug": true,
+    "car_model": "your:car:model",
+    "token": "your-token-goes-here"
+}
+```
+4. Sync these settings to the AutoPi.
+
+Setting "debug": true in either script will add additional logging to the minion log to help in finding errors.  Feel free to contact me if you have trouble with running this script as a service.
+
+One additional note, I haven't figured out a good way to auto-restart the service on script update, so you might need to reboot the device between script changes.  This makes it extra annoying to debug the script.
+
 ## Add-Ons for the ABRP Script
 
 The ABRP script now supports Add-Ons.  We've found that the obd.query calls via `__salt__` take quite a long time to execute, so making multiple redundant calls really slows the whole system down.

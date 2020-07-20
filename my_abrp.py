@@ -445,7 +445,7 @@ class HKMC(CarOBD):
       }
     elif int(self.tc.year) < 19:
       # older cars
-      self.inflate_pidspids = {
+      self.pids = {
         'soc':        "2,105,({32}/2.0),7E4",
         'soh':        "2,105,({us:26:27})/10.0,7E4",
         'voltage':    "2,101,({us:13:14})/10.0,7E4",
@@ -514,6 +514,7 @@ if __name__ == "__main__":
   typecodes = ['hyundai:ioniq:14:28:other','chevy:bolt:17:60:other','hyundai:kona:19:64:other','emulator']
   for typecode in typecodes:
     poller = Poller(typecode,'test',None)
+    print typecode
     pp.pprint(poller.car.pids)
     poller.get_tlm()
   

@@ -405,7 +405,7 @@ class Chevy(CarOBD):
       'is_charging':    "22,436C,({s:1:2})/20.0,7E4",
       'ext_temp':       "22,801E,({1}/2)-40.0,7E4",
       'batt_temp':      "22,434F,({1}-40.0),7E4",
-      'speed':          "22,000D,{1},7E0",
+      # 'speed':          "22,000D,{1},7E0",
       'prnd':           "22,2889,({1}),7E1", # 8=P, 3=D, 7=R, 6=N, 1=L
       'might_be_dcfc':  "22,4369,(not {1}),7E4", #AC current.  If AC Current is 0, then it could be a DCFC
     }

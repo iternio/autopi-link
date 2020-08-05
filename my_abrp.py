@@ -331,7 +331,14 @@ class CarOBD:
 
   def is_driving(self):
     # Simple version if we don't have anything better. Override these per-vehicle if we have something better.
-    return self.in_and_true('is_driving')
+    if self.in_and_true('is_driving'):
+      return True
+    elif 'is_driving' in self.data:
+      return False
+    elif 'speed' in self.data:
+      return self.data['speed'] != 0
+    else:
+      return None
 
   def is_charging(self):
     return self.in_and_true('is_charging')

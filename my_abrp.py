@@ -339,7 +339,7 @@ class CarOBD:
     elif 'is_driving' in self.data:
       return False
     elif 'speed' in self.data:
-      return self.data['speed'] != 0
+      return abs(self.data['speed']) >= 0.5
     else:
       return None
 

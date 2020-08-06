@@ -326,7 +326,7 @@ class CarOBD:
       should_be_awake = True
     elif 'speed' in self.data and round(self.data['speed']) != 0:
       should_be_awake = True
-    elif 'power' in self.data and self.data['power'] != 0:
+    elif 'power' in self.data and abs(self.data['power']) >= 0.1:
       should_be_awake = True
     elif self.is_driving() is not None:
       should_be_awake = self.is_driving() # Charging cases should be caught above

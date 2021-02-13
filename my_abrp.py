@@ -21,6 +21,23 @@ def check_restart():
     safelog("Script has been updated, restarting to incorporate updates.",always=True)
     os._exit(1)
 
+def set_state(state):
+  try:
+    safelog(json.dumps(state))
+    with open('abrp_state','w') as f:
+      json.dump(state,f)
+  except:
+    safelog("Could not write abrp_state")
+
+def get_state():
+  try:
+    with open('abrp_state','r') as f:
+      state = json.load(f)
+      return state
+  except:
+    safelog("Could not load abrp_state")
+    return None
+
 
 def tlm(test=False,testdata=None, token=None, car_model=None, debug=False, scripts=None):
   global global_debug
@@ -86,6 +103,18 @@ class Poller():
     if not self.token:
       safelog("Token or Car Model missing from job kwargs")
       return None
+    
+    if self.last_data_sent == {}:
+      # First time running right now, fill in from file in case we're just waking up for periodic checkin.
+      try:
+        data = get_state()
+        if data is not None:
+          for d in data:
+            if d not in self.car.data:
+              self.car.data[d] = data[d]
+      except:
+        safelog(traceback.format_exc())
+        safelog("Ran into an issue loading state from file.")
     if "soc" in self.car.data and 'power' in self.car.data:
       min_changed = ["soc","power","is_charging"]
       should_send = False
@@ -99,16 +128,20 @@ class Poller():
         should_send = False
       # Do send at least once every 60s if we're charging
       dt = time.time() - self.last_data_time
-      if self.car.is_charging() and dt > 60:
+      if self.car.is_charging() and dt > 30:
         safelog('Sending because charging timeout')
         should_send = True
       # Do send at least once every 30s if we're driving.
-      elif self.car.is_driving() and dt > 30:
+      elif self.car.is_driving() and dt > 1:
         safelog('Sending because driving timeout')
         should_send = True
       # Send if the last status was charging, but this one is not.
       elif 'is_charging' in self.last_data_sent and self.last_data_sent['is_charging'] and not self.car.is_charging():
         safelog('Sending because just stopped charging.')
+        should_send = True
+      elif dt > 30 and self.car.should_be_awake():
+        should_send = True
+      elif dt > 300:
         should_send = True
       
       # Always send the first data point to initialize the session.    
@@ -121,6 +154,7 @@ class Poller():
       safelog(self.car.data)
       if should_send:
         data = self.car.get_pruned_data()
+        set_state(data)
         params = {'token': self.token, 'api_key': self.apikey, 'tlm': json.dumps(data, separators=(',',':'))}
         url = 'https://api.iternio.com/1/tlm/send?'+urllib.urlencode(params)
         try:
@@ -323,7 +357,7 @@ class CarOBD:
       should_be_awake = True
     elif 'speed' in self.data and round(self.data['speed']) != 0:
       should_be_awake = True
-    elif 'power' in self.data and abs(self.data['power']) >= 0.1:
+    elif 'power' in self.data and self.data['power'] != 0:
       should_be_awake = True
     elif self.is_driving() is not None:
       should_be_awake = self.is_driving() # Charging cases should be caught above
@@ -406,15 +440,16 @@ class Chevy(CarOBD):
       'charge_voltage': "22,436B,({us:1:2})/2.0,7E4",
       'current':        "22,2414,({s:1:2})/20.0,7E1",
       'charge_current': "22,436C,({s:1:2})/20.0,7E4",
-      'is_charging':    "22,436C,({s:1:2})/20.0,7E4",
-      'ext_temp':       "22,801E,({1}/2)-40.0,7E4",
+      'is_charging':    "22,4531,{1},7E4",
+      'ext_temp':       "22,0046,({1}-40.0),7E4",
       'batt_temp':      "22,434F,({1}-40.0),7E4",
-      # 'speed':          "22,000D,{1},7E0",
+      'speed':          "22,000D,{1},7E0",
       'prnd':           "22,2889,({1}),7E1", # 8=P, 3=D, 7=R, 6=N, 1=L
-      'might_be_dcfc':  "22,4369,(not {1}),7E4", #AC current.  If AC Current is 0, then it could be a DCFC
     }
     if int(self.tc.year) < 19:
-      self.pids['capacity'] = "22,41A3,({us:1:2})/30.0,7E4" #Reports strange results in post-2019 Bolts.
+      self.pids['capacity'] = "22,41A3,({us:1:2})*0.032,7E4" #Reports strange results in post-2019 Bolts.
+    else:
+      self.pids['capacity'] = "22,45F9,({us:1:2})*0.032,7E4"
     self.inflate_pids()
 
   ###################################################################################################
@@ -430,8 +465,10 @@ class Chevy(CarOBD):
       return False # No response means we're not driving.
   
   def is_charging(self):
-    if self.in_and_true('is_charging') and self.in_and_true('might_be_dcfc'):
+    if self.in_and_true('is_charging') and self.data['is_charging'] > 2:
       self.data['is_dcfc'] = 1
+    else:
+      self.data['is_dcfc'] = 0
     return self.in_and_true('is_charging')
 
 class HKMC(CarOBD):
@@ -521,7 +558,6 @@ if __name__ == "__main__":
   typecodes = ['hyundai:ioniq:14:28:other','chevy:bolt:17:60:other','hyundai:kona:19:64:other','emulator']
   for typecode in typecodes:
     poller = Poller(typecode,'test',None)
-    print typecode
     pp.pprint(poller.car.pids)
     poller.get_tlm()
   

@@ -28,6 +28,16 @@ def set_state(state):
       json.dump(state,f)
   except:
     safelog("Could not write abrp_state")
+
+def get_state():
+  try:
+    with open('abrp_state','r') as f:
+      state = json.load(f)
+      return state
+  except:
+    safelog("Could not load abrp_state")
+    return None
+
 def start(token=None, car_model=None, debug=False, scripts=None, **settings):
   try:
     global global_debug
@@ -53,14 +63,6 @@ def start(token=None, car_model=None, debug=False, scripts=None, **settings):
   finally:
     safelog("Exiting ABRP script")
 
-def get_state():
-  try:
-    with open('abrp_state','r') as f:
-      state = json.load(f)
-      return state
-  except:
-    safelog("Could not load abrp_state")
-    return None
 class Poller():
   def __init__(self, typecode, token, scripts):
     self.apikey = '6f6a554f-d8c8-4c72-8914-d5895f58b1eb'

@@ -106,11 +106,13 @@ class Poller():
     
     if self.last_data_sent == {}:
       # First time running right now, fill in from file in case we're just waking up for periodic checkin.
+      self.manage_sleep(force=True)
+      # Force us to be awake for at least 30 minutes on first boot.
       try:
         data = get_state()
         if data is not None:
           for d in data:
-            if d not in self.car.data:
+            if d not in self.car.data and d in ['soc','lat','lon','soh','capacity','odometer']:
               self.car.data[d] = data[d]
       except:
         safelog(traceback.format_exc())
@@ -184,7 +186,8 @@ class Poller():
 
 
   def manage_sleep(self,force=False):
-    if time.time() - self.last_sleep_time < 60 and not force:
+    # Check sleep every 2 minutes, unless forced.
+    if time.time() - self.last_sleep_time < 120 and not force:
       return
     else:
       self.last_sleep_time = time.time()
@@ -197,7 +200,7 @@ class Poller():
       # clear all sleep timers and re-set timers for fail-safe.
       safelog("Should be awake:" +str(should_be_awake) + ' - Resetting sleep timer')
       try:
-        __salt__['power.sleep_timer'](*[],**{'clear': '*', 'add': 'ABRP Sleep Timer', 'period': 600, 'reason': 'Vehicle inactive'})
+        __salt__['power.sleep_timer'](*[],**{'clear': '*', 'add': 'ABRP Sleep Timer', 'period': 1800, 'reason': 'Vehicle inactive'})
       except:
         safelog(traceback.format_exc(), always=True)
         pass

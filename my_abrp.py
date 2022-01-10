@@ -490,6 +490,8 @@ class HKMC(CarOBD):
         'speed':      "220,100,bytes_to_int(message.data[32:33]),7B3",
         'kwh_charged':"220,101,(bytes_to_int(message.data[41:45]))/10.0,7E4",
       }
+      if self.tc.model in ['ev6', 'ioniq5']:
+        self.pids['is_charging'] = "220,101,int({10:7}),7E4"
     elif int(self.tc.year) < 19:
       # older cars
       self.pids = {

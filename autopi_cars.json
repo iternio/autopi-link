@@ -8,4 +8,7 @@
   "hyundai:ioniq5:22:74": {"wake_pid": "Unknown"},
   "kia:ev6:22:58": {"wake_pid": "Unknown"},
   "kia:ev6:22:77": {"wake_pid": "Unknown"}
+  "genesis:gv60:23:74:awd:perf": {"wake_pid": "Unknown"},
+  "genesis:gv60:23:74:awd": {"wake_pid": "Unknown"},
+  "genesis:gv60:23:74:rwd": {"wake_pid": "Unknown"}
 }

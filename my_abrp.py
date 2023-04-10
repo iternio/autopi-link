@@ -349,9 +349,15 @@ class CarOBD:
     check_restart()
     self.location = None
     try:
-      self.location = __salt__['ec2x.gnss_location'](*[], **{})
+      #self.location = __salt__['ec2x.gnss_location'](*[], **{})
+      modconn = __salt__['modem.connection']('execute', 'AT$GPSACP', **{})['data']
+      #$GPSACP: <UTC>,<latitude>,<longitude>,<hdop>,<altitude>,<fix>,<cog>,<spkm>,<spkn>,<date>,<nsat_gps>,<nsat_glonass>
+      modconn = modconn.replace(':',' ').replace(',',' ').split()
+      safelog('Got location: ' + modconn[2] + ', ' + modconn[3] + ', ' + modconn[7] + ', ' + modconn[8])
+      self.location = {'lat':modconn[2], 'lon':modconn[3], 'cog':float(modconn[7]), 'sog_km':float(modconn[8])}
     except:
       # Didn't get location data, skip it.
+      safelog('Failed to get location')
       pass
 
   def should_be_awake(self):

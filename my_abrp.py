@@ -89,7 +89,7 @@ class Poller():
       safelog("No scripts given in kwargs")
     self.scripts = scripts
     self.tc = TypeCode(typecode)
-    if self.tc.make in ['chevy','opel']:
+    if self.tc.make in ['chevy','chevrolet','opel']:
       self.car = Chevy(typecode)
     elif self.tc.make in ['hyundai','kia']:
       self.car = HKMC(typecode)

@@ -354,7 +354,17 @@ class CarOBD:
       #$GPSACP: <UTC>,<latitude>,<longitude>,<hdop>,<altitude>,<fix>,<cog>,<spkm>,<spkn>,<date>,<nsat_gps>,<nsat_glonass>
       modconn = modconn.replace(':',' ').replace(',',' ').split()
       safelog('Got location: ' + modconn[2] + ', ' + modconn[3] + ', ' + modconn[7] + ', ' + modconn[8])
-      self.location = {'lat':modconn[2], 'lon':modconn[3], 'cog':float(modconn[7]), 'sog_km':float(modconn[8])}
+      lat_deg = int(modconn[2][:2])
+      lat_min = float(modconn[2][2:-1]) / 60
+      lat = lat_deg + lat_min
+      if modconn[2][-1:] == 'S':
+        lat = lat * -1
+      lon_deg = int(modconn[3][:3])
+      lon_min = float(modconn[3][3:-1]) / 60
+      lon = lon_deg + lon_min
+      if modconn[3][-1:] == 'W':
+        lon = lon * -1
+      self.location = {'lat':lat, 'lon':lon, 'cog':float(modconn[7]), 'sog_km':float(modconn[8])}
     except:
       # Didn't get location data, skip it.
       safelog('Failed to get location')

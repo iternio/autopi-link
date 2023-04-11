@@ -460,7 +460,8 @@ class Chevy(CarOBD):
       'current':        "22,2414,({s:1:2})/20.0,7E1",
       'charge_current': "22,436C,({s:1:2})/20.0,7E4",
       'is_charging':    "22,4531,{1},7E4",
-      'ext_temp':       "22,801F,({1}/2-40.0),7E4",
+      'ext_temp':       "22,801E,(({1}/2.0)-40.0),7E4",
+      # Was 801F which always = -40
       'batt_temp':      "22,434F,({1}-40.0),7E4",
       # 'speed':          "22,000D,{1},7E0",
       'prnd':           "22,2889,({1}),7E1", # 8=P, 3=D, 7=R, 6=N, 1=L
@@ -468,7 +469,7 @@ class Chevy(CarOBD):
     if int(self.tc.year) < 19:
       self.pids['capacity'] = "22,41A3,({us:1:2})*0.032,7E4" #Reports strange results in post-2019 Bolts.
     else:
-      self.pids['capacity'] = "22,45F9,({us:1:2})*0.032,7E4"
+      self.pids['capacity'] = "22,45F9,({us:1:2})*0.0032,7E4" #Was *0.032 which displayed 621.3 kW
     self.inflate_pids()
 
   ###################################################################################################
